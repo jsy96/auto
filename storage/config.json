@@ -1,10 +1,10 @@
-﻿{
-    "tools":  [
-                  {
-                      "description":  "生成并打开元胞自动机交互式网页，支持生命游戏(2D)和初等元胞自动机(1D)，包含多种预设图案和颜色主题",
-                      "name":  "cellular_automaton",
-                      "file":  "cellular_automaton",
-                      "category":  "ai-discovered"
-                  }
-              ]
+{
+    "tools": [
+        {
+            "description": "元胞自动机交互式网页：从滑翔机到图灵完备CPU，包含6个层级 - 滑翔机、图灵完备、逻辑门(与非门)、加法器+寄存器、扩展CPU、完整CPU",
+            "name": "cellular_automaton",
+            "file": "storage/tools/cellular_automaton.ps1",
+            "category": "ai-discovered"
+        }
+    ]
 }

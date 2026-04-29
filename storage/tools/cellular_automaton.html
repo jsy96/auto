@@ -1,358 +1,904 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>元胞自动机 - Cellular Automaton</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>元胞自动机 - 从滑翔机到图灵完备CPU</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a0a1a;
-    color: #e0e0e0;
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-  .header {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    padding: 10px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid #2a2a4a;
-    flex-shrink: 0;
-  }
-  .header h1 {
-    font-size: 22px;
-    background: linear-gradient(90deg, #00d2ff, #7b2ff7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: 2px;
-  }
-  .header .subtitle { font-size: 12px; color: #666; margin-top: 2px; }
-  .controls {
-    background: #111128;
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid #2a2a4a;
-    flex-shrink: 0;
-  }
-  .control-group { display: flex; align-items: center; gap: 6px; }
-  .control-group label { font-size: 13px; color: #aaa; white-space: nowrap; }
-  .controls select, .controls input[type="number"] {
-    background: #1a1a3a; border: 1px solid #3a3a6a; color: #ddd;
-    padding: 5px 10px; border-radius: 6px; font-size: 13px; outline: none;
-  }
-  .controls select:focus, .controls input:focus { border-color: #7b2ff7; }
-  .controls input[type="range"] {
-    -webkit-appearance: none; height: 6px; background: #2a2a5a;
-    border-radius: 3px; outline: none; width: 100px;
-  }
-  .controls input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px;
-    background: #7b2ff7; border-radius: 50%; cursor: pointer;
-  }
-  .btn {
-    padding: 6px 16px; border: none; border-radius: 6px;
-    font-size: 13px; cursor: pointer; transition: all 0.2s; font-weight: 500;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btn-primary { background: linear-gradient(135deg, #7b2ff7, #00d2ff); color: #fff; }
-  .btn-danger { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
-  .btn-secondary { background: #2a2a5a; color: #ccc; border: 1px solid #3a3a6a; }
-  .btn-success { background: linear-gradient(135deg, #27ae60, #2ecc71); color: #fff; }
-  .canvas-container {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
-  }
-  canvas { border: 1px solid #2a2a4a; cursor: crosshair; image-rendering: pixelated; }
-  .statusbar {
-    background: #111128; padding: 6px 20px; display: flex;
-    align-items: center; justify-content: space-between;
-    font-size: 12px; color: #666; border-top: 1px solid #2a2a4a; flex-shrink: 0;
-  }
-  .statusbar .stat { display: flex; align-items: center; gap: 4px; }
-  .statusbar .stat .val { color: #00d2ff; font-weight: 600; }
-  .presets-panel {
-    position: absolute; top: 10px; right: 10px;
-    background: rgba(20, 20, 50, 0.95); border: 1px solid #3a3a6a;
-    border-radius: 10px; padding: 12px; display: none;
-    max-height: 80vh; overflow-y: auto; z-index: 100; min-width: 180px;
-  }
-  .presets-panel.show { display: block; }
-  .presets-panel h3 { font-size: 14px; color: #7b2ff7; margin-bottom: 8px; }
-  .preset-item {
-    padding: 6px 10px; margin: 3px 0; background: #1a1a3a;
-    border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s;
-  }
-  .preset-item:hover { background: #2a2a5a; color: #00d2ff; }
-  .color-swatch {
-    width: 20px; height: 20px; border-radius: 50%;
-    border: 2px solid transparent; cursor: pointer;
-    display: inline-block; transition: all 0.2s;
-  }
-  .color-swatch:hover, .color-swatch.active { border-color: #fff; transform: scale(1.2); }
-  .rule-display {
-    font-family: monospace; font-size: 12px; color: #00d2ff;
-    background: #1a1a3a; padding: 3px 8px; border-radius: 4px;
-  }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e17;--panel:#111827;--border:#1e2a42;
+  --text:#e0e6f0;--dim:#6b7a94;--accent:#00ff88;--accent2:#00aaff;
+  --cell:#00ff88;--grid:#0f1520;--danger:#ff4466;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column}
+#header{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#header h1{font-size:16px;font-weight:600;color:var(--accent);white-space:nowrap}
+#header .gen{font-size:12px;color:var(--dim);margin-left:auto}
+#levels{display:flex;gap:2px;background:var(--panel);border-bottom:1px solid var(--border);padding:0 12px;flex-shrink:0;overflow-x:auto}
+.ltab{padding:8px 14px;font-size:12px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.ltab:hover{color:var(--text)}.ltab.active{color:var(--accent);border-bottom-color:var(--accent)}
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:12px}
+#sidebar h3{font-size:13px;color:var(--accent2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.pat-btn{display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:4px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;cursor:pointer;transition:all .15s}
+.pat-btn:hover{background:rgba(0,255,136,.08);border-color:var(--accent)}
+.pat-btn.active{background:rgba(0,255,136,.12);border-color:var(--accent);color:var(--accent)}
+.pat-btn .desc{font-size:10px;color:var(--dim);margin-top:2px}
+#info{margin-top:16px;padding:12px;background:rgba(0,170,255,.05);border:1px solid rgba(0,170,255,.15);border-radius:6px;font-size:12px;line-height:1.6;color:var(--dim)}
+#info h4{color:var(--accent2);margin-bottom:6px;font-size:13px}
+#info code{background:rgba(0,255,136,.1);padding:1px 4px;border-radius:2px;color:var(--accent);font-size:11px}
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+canvas{display:block;cursor:crosshair}
+#controls{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(17,24,39,.92);padding:8px 14px;border-radius:8px;border:1px solid var(--border);backdrop-filter:blur(8px)}
+.ctrl-btn{width:36px;height:32px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ctrl-btn:hover{background:rgba(0,255,136,.12);border-color:var(--accent)}
+.ctrl-btn.active{background:rgba(0,255,136,.2);color:var(--accent)}
+#speed-label{font-size:11px;color:var(--dim);display:flex;align-items:center;padding:0 8px}
+#circuit-panel{flex:1;position:relative;overflow:hidden;background:var(--bg);display:none}
+#circuit-panel canvas{display:block}
+#cpu-panel{flex:1;overflow:auto;background:var(--bg);display:none;padding:20px;font-family:'Cascadia Code','Consolas',monospace;font-size:13px}
+.cpu-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:1000px}
+.cpu-section{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px}
+.cpu-section h4{color:var(--accent2);font-size:12px;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.cpu-mem{font-size:11px;line-height:1.8}
+.cpu-mem .addr{color:var(--dim)}.cpu-mem .val{color:var(--accent)}.cpu-mem .cur{background:rgba(0,255,136,.12);padding:0 4px;border-radius:2px}
+.cpu-regs .reg{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.cpu-regs .reg .rn{color:var(--dim);font-size:11px}.cpu-regs .reg .rv{color:var(--accent)}
+.asm-editor{width:100%;height:200px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:inherit;font-size:12px;padding:8px;resize:vertical}
+.cpu-btn{padding:6px 14px;background:rgba(0,255,136,.12);border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-size:12px;cursor:pointer;margin-right:6px;margin-top:8px}
+.cpu-btn:hover{background:rgba(0,255,136,.25)}
+.cpu-output{font-size:11px;color:var(--dim);margin-top:8px;white-space:pre-wrap;max-height:150px;overflow-y:auto;background:rgba(0,0,0,.2);padding:8px;border-radius:4px}
+.truth-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.truth-table th{color:var(--accent2);padding:4px 8px;border-bottom:1px solid var(--border);text-align:center}
+.truth-table td{padding:4px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,.03)}
+.truth-table .hi{color:var(--accent);font-weight:bold}
 </style>
 </head>
 <body>
-<div class="header">
-  <div>
-    <h1>🔬 元胞自动机</h1>
-    <div class="subtitle">Cellular Automaton Simulator</div>
-  </div>
-  <div class="control-group" style="gap:8px;">
-    <div class="color-swatch active" data-theme="cyber" style="background: linear-gradient(135deg, #7b2ff7, #00d2ff);" title="赛博主题"></div>
-    <div class="color-swatch" data-theme="fire" style="background: linear-gradient(135deg, #e74c3c, #f39c12);" title="烈焰主题"></div>
-    <div class="color-swatch" data-theme="matrix" style="background: linear-gradient(135deg, #00ff41, #008f11);" title="矩阵主题"></div>
-    <div class="color-swatch" data-theme="ocean" style="background: linear-gradient(135deg, #0077b6, #00b4d8);" title="海洋主题"></div>
-  </div>
+<div id="header">
+  <h1>元胞自动机：从滑翔机到图灵完备CPU</h1>
+  <span class="gen" id="genLabel">Gen: 0</span>
 </div>
-<div class="controls">
-  <div class="control-group">
-    <label>模式:</label>
-    <select id="modeSelect">
-      <option value="life">生命游戏 (2D)</option>
-      <option value="1d">初等自动机 (1D)</option>
-    </select>
+<div id="levels"></div>
+<div id="main">
+  <div id="sidebar">
+    <h3>图案库</h3>
+    <div id="patternList"></div>
+    <div id="info"><h4>说明</h4><p>选择一个图案开始探索</p></div>
   </div>
-  <div class="control-group" id="ruleGroup" style="display:none;">
-    <label>规则:</label>
-    <input type="number" id="ruleNum" value="30" min="0" max="255" style="width:70px;">
-    <span class="rule-display" id="ruleBits">00011110</span>
+  <div id="canvas-wrap">
+    <canvas id="golCanvas"></canvas>
+    <div id="controls">
+      <button class="ctrl-btn" id="btnPlay" title="播放/暂停">▶</button>
+      <button class="ctrl-btn" id="btnStep" title="单步">⏭</button>
+      <button class="ctrl-btn" id="btnClear" title="清除">✕</button>
+      <span id="speed-label">速度: <select id="speedSel"><option>1x</option><option selected>5x</option><option>10x</option><option>20x</option><option>Max</option></select></span>
+      <button class="ctrl-btn" id="btnZoomIn" title="放大">+</button>
+      <button class="ctrl-btn" id="btnZoomOut" title="缩小">-</button>
+    </div>
   </div>
-  <div class="control-group">
-    <label>网格:</label>
-    <select id="gridSize">
-      <option value="3">大 (3px)</option>
-      <option value="4" selected>中 (4px)</option>
-      <option value="6">小 (6px)</option>
-      <option value="8">超小 (8px)</option>
-    </select>
+  <div id="circuit-panel"><canvas id="circuitCanvas"></canvas></div>
+  <div id="cpu-panel">
+    <div class="cpu-grid">
+      <div>
+        <div class="cpu-section"><h4>汇编程序</h4>
+          <textarea class="asm-editor" id="asmCode">; 计算 3 + 5
+LOAD_A 3
+LOAD_B 5
+ADD A B
+STORE_C 0
+OUTPUT C
+HALT</textarea>
+          <div>
+            <button class="cpu-btn" id="cpuRun">运行</button>
+            <button class="cpu-btn" id="cpuStep">单步</button>
+            <button class="cpu-btn" id="cpuReset">重置</button>
+          </div>
+          <div class="cpu-output" id="cpuOutput">输出将显示在这里...</div>
+        </div>
+        <div class="cpu-section"><h4>指令集</h4>
+          <div style="font-size:11px;line-height:1.8;color:var(--dim)">
+            <code>LOAD_A val</code> A←val<br>
+            <code>LOAD_B val</code> B←val<br>
+            <code>ADD A/B A/B</code> C←A+B<br>
+            <code>SUB A/B A/B</code> C←A-B<br>
+            <code>AND A/B A/B</code> C←A&B<br>
+            <code>OR A/B A/B</code> C←A|B<br>
+            <code>NOT A/B</code> C←~A<br>
+            <code>STORE_C addr</code> MEM[addr]←C<br>
+            <code>LOAD_C addr</code> C←MEM[addr]<br>
+            <code>JMP addr</code> PC←addr<br>
+            <code>JZ addr</code> if C==0: PC←addr<br>
+            <code>JNZ addr</code> if C!=0: PC←addr<br>
+            <code>CMP A/B A/B</code> C←比较结果<br>
+            <code>OUTPUT A/B/C</code> 输出寄存器<br>
+            <code>HALT</code> 停机
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="cpu-section"><h4>寄存器</h4><div class="cpu-regs" id="cpuRegs"></div></div>
+        <div class="cpu-section"><h4>内存</h4><div class="cpu-mem" id="cpuMem"></div></div>
+        <div class="cpu-section"><h4>CPU状态</h4><div id="cpuState" style="font-size:11px;color:var(--dim)">PC: 0 | 运行中: 否</div></div>
+      </div>
+    </div>
   </div>
-  <div class="control-group">
-    <label>速度:</label>
-    <input type="range" id="speedSlider" min="1" max="60" value="15">
-    <span id="speedVal" style="font-size:12px;color:#aaa;width:30px;">15</span>
-  </div>
-  <button class="btn btn-primary" id="btnPlay">▶ 运行</button>
-  <button class="btn btn-secondary" id="btnStep">⏭ 单步</button>
-  <button class="btn btn-danger" id="btnClear">✖ 清除</button>
-  <button class="btn btn-secondary" id="btnRandom">🎲 随机</button>
-  <button class="btn btn-success" id="btnPresets">📋 预设</button>
-</div>
-<div class="canvas-container">
-  <canvas id="canvas"></canvas>
-  <div class="presets-panel" id="presetsPanel">
-    <h3>🏗 生命游戏预设</h3>
-    <div class="preset-item" data-preset="glider">滑翔机 Glider</div>
-    <div class="preset-item" data-preset="lwss">轻量飞船 LWSS</div>
-    <div class="preset-item" data-preset="pulsar">脉冲星 Pulsar</div>
-    <div class="preset-item" data-preset="pentadecathlon">五倍体 Pentadecathlon</div>
-    <div class="preset-item" data-preset="gosper">高斯帕枪 Gosper Gun</div>
-    <div class="preset-item" data-preset="acorn">橡果 Acorn</div>
-    <div class="preset-item" data-preset="rpentomino">R五联骨牌</div>
-    <div class="preset-item" data-preset="diehard">顽固 Diehard</div>
-    <h3 style="margin-top:10px;">🔢 1D 经典规则</h3>
-    <div class="preset-item" data-rule="30">Rule 30 (混沌)</div>
-    <div class="preset-item" data-rule="90">Rule 90 (谢尔宾斯基)</div>
-    <div class="preset-item" data-rule="110">Rule 110 (图灵完备)</div>
-    <div class="preset-item" data-rule="184">Rule 184 (交通流)</div>
-    <div class="preset-item" data-rule="150">Rule 150 (分形)</div>
-    <div class="preset-item" data-rule="60">Rule 60 (三角)</div>
-  </div>
-</div>
-<div class="statusbar">
-  <div style="display:flex;gap:20px;">
-    <div class="stat">代数: <span class="val" id="genCount">0</span></div>
-    <div class="stat">活细胞: <span class="val" id="cellCount">0</span></div>
-    <div class="stat">网格: <span class="val" id="gridInfo">-</span></div>
-  </div>
-  <div class="stat">点击/拖拽绘制 | 空格 运行/暂停 | N 单步 | C 清除 | R 随机</div>
 </div>
 <script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let cellSize = 4, cols, rows, grid, nextGrid;
-let running = false, generation = 0, animId = null, lastTime = 0, speed = 15;
-let mode = 'life', rule1d = 30, currentRow1d = 0, history1d = [];
-let isDrawing = false, drawValue = 1;
-const themes = {
-  cyber:  { alive: '#7b2ff7', alive2: '#00d2ff', bg: '#0a0a1a', grid: '#0f0f2a' },
-  fire:   { alive: '#e74c3c', alive2: '#f39c12', bg: '#1a0a0a', grid: '#1a0f0f' },
-  matrix: { alive: '#00ff41', alive2: '#008f11', bg: '#000a00', grid: '#001a00' },
-  ocean:  { alive: '#0077b6', alive2: '#00b4d8', bg: '#0a0a1a', grid: '#0a1a2a' }
-};
-let currentTheme = 'cyber';
-
-function init() { resizeCanvas(); clearGrid(); draw(); }
-function resizeCanvas() {
-  const c = canvas.parentElement;
-  const w = c.clientWidth - 20, h = c.clientHeight - 20;
-  cols = Math.floor(w / cellSize); rows = Math.floor(h / cellSize);
-  canvas.width = cols * cellSize; canvas.height = rows * cellSize;
-  document.getElementById('gridInfo').textContent = cols + '×' + rows;
-}
-function clearGrid() {
-  generation = 0; currentRow1d = 0; history1d = [];
-  grid = new Uint8Array(cols * rows); nextGrid = new Uint8Array(cols * rows);
-  updateStats();
-}
-function randomize() {
-  clearGrid();
-  if (mode === 'life') { for (let i = 0; i < grid.length; i++) grid[i] = Math.random() < 0.3 ? 1 : 0; }
-  else { grid[Math.floor(cols / 2)] = 1; history1d = [grid.slice()]; }
-  draw(); updateStats();
-}
-function stepLife() {
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    let n = 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      n += grid[((y + dy + rows) % rows) * cols + (x + dx + cols) % cols];
+// ============================================================================
+// Game of Life Engine
+// ============================================================================
+class GameOfLife {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.grid = new Uint8Array(w * h);
+    this.buf = new Uint8Array(w * h);
+    this.gen = 0;
+  }
+  idx(x, y) { return y * this.w + x; }
+  get(x, y) {
+    if (x < 0 || x >= this.w || y < 0 || y >= this.h) return 0;
+    return this.grid[this.idx(x, y)];
+  }
+  set(x, y, v) {
+    if (x >= 0 && x < this.w && y >= 0 && y < this.h)
+      this.grid[this.idx(x, y)] = v;
+  }
+  toggle(x, y) {
+    if (x >= 0 && x < this.w && y >= 0 && y < this.h)
+      this.grid[this.idx(x, y)] ^= 1;
+  }
+  step() {
+    const {w, h, grid, buf} = this;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h)
+              n += grid[ny * w + nx];
+          }
+        const i = y * w + x;
+        buf[i] = grid[i] ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
+      }
     }
-    const i = y * cols + x;
-    nextGrid[i] = grid[i] ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
+    [this.grid, this.buf] = [this.buf, this.grid];
+    this.gen++;
   }
-  [grid, nextGrid] = [nextGrid, grid]; generation++;
+  clear() { this.grid.fill(0); this.gen = 0; }
+  load(cells, ox, oy) {
+    for (const [x, y] of cells) this.set(ox + x, oy + y, 1);
+  }
+  countAlive() { let c = 0; for (let i = 0; i < this.grid.length; i++) c += this.grid[i]; return c; }
 }
-function step1D() {
-  if (currentRow1d >= rows - 1) { history1d.shift(); currentRow1d = rows - 1; }
-  const cur = currentRow1d === 0 ? grid.slice() : history1d[history1d.length - 1];
-  const nxt = new Uint8Array(cols);
-  for (let x = 0; x < cols; x++) {
-    const p = (cur[(x-1+cols)%cols] << 2) | (cur[x] << 1) | cur[(x+1)%cols];
-    nxt[x] = (rule1d >> p) & 1;
+
+// ============================================================================
+// Pattern Definitions
+// ============================================================================
+const P = {
+  // Level 1: Gliders
+  glider: { name: '滑翔机 (Glider)', desc: '最小的移动图案，沿对角线移动',
+    cells: [[1,0],[2,1],[0,2],[1,2],[2,2]] },
+  lwss: { name: '轻量级飞船 (LWSS)', desc: '最小的正交飞船',
+    cells: [[1,0],[4,0],[0,1],[0,2],[4,2],[0,3],[1,3],[2,3],[3,3]] },
+  mwss: { name: '中量级飞船 (MWSS)', desc: '中型正交飞船',
+    cells: [[2,0],[0,1],[0,2],[5,2],[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[1,4]] },
+  hwss: { name: '重量级飞船 (HWSS)', desc: '大型正交飞船',
+    cells: [[2,0],[0,1],[0,2],[6,2],[0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[1,4],[5,4]] },
+
+  // Level 2: Turing Complete
+  gliderGun: { name: 'Gosper滑翔机枪', desc: '周期30产生滑翔机，证明无限增长',
+    cells: [[24,0],[22,1],[24,1],[12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
+      [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],[0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
+      [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],[10,6],[16,6],[24,6],
+      [11,7],[15,7],[12,8],[13,8]] },
+  rpentomino: { name: 'R-五联骨牌', desc: '5个细胞，稳定前存活1103代',
+    cells: [[1,0],[2,0],[0,1],[1,1],[1,2]] },
+  acorn: { name: '橡子 (Acorn)', desc: '7个细胞，稳定前存活5206代',
+    cells: [[1,0],[3,1],[0,2],[1,2],[4,2],[5,2],[6,2]] },
+  diehard: { name: '顽固 (Diehard)', desc: '7个细胞，130代后消亡',
+    cells: [[6,0],[0,1],[1,1],[1,2],[5,2],[6,2],[7,2]] },
+  block: { name: '方块 (Block)', desc: '最简静物',
+    cells: [[0,0],[1,0],[0,1],[1,1]] },
+  blinker: { name: '闪光灯 (Blinker)', desc: '最简振荡器，周期2',
+    cells: [[0,0],[1,0],[2,0]] },
+  pulsar: { name: '脉冲星 (Pulsar)', desc: '周期3振荡器，优美的对称',
+    cells: (function(){
+      const c = [];
+      const rows = [
+        [2,0],[3,0],[4,0],[8,0],[9,0],[10,0],
+        [0,2],[5,2],[7,2],[12,2],[0,3],[5,3],[7,3],[12,3],[0,4],[5,4],[7,4],[12,4],
+        [2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
+      ];
+      rows.forEach(([x,y])=>{c.push([x,y]);c.push([x,12-y]);});
+      return [...new Set(c.map(p=>p.join(',')))].map(s=>s.split(',').map(Number));
+    })() },
+
+  // Level 3+: Conceptual patterns (shown in circuit view)
+  notGate: { name: 'NOT门 (非门)', desc: '输入取反', type:'circuit', gate:'NOT' },
+  andGate: { name: 'AND门 (与门)', desc: '全1则1', type:'circuit', gate:'AND' },
+  orGate: { name: 'OR门 (或门)', desc: '有1则1', type:'circuit', gate:'OR' },
+  nandGate: { name: 'NAND门 (与非门)', desc: '万能门，可构建任何逻辑', type:'circuit', gate:'NAND' },
+  xorGate: { name: 'XOR门 (异或门)', desc: '不同则1', type:'circuit', gate:'XOR' },
+  halfAdder: { name: '半加器', desc: '1位加法：Sum=XOR, Carry=AND', type:'circuit', gate:'HALF_ADDER' },
+  fullAdder: { name: '全加器', desc: '带进位的1位加法器', type:'circuit', gate:'FULL_ADDER' },
+  fourBitAdder: { name: '4位加法器', desc: '4位二进制加法', type:'circuit', gate:'ADDER4' },
+  srLatch: { name: 'SR锁存器', desc: '最简存储元件', type:'circuit', gate:'SR_LATCH' },
+  dFlipFlop: { name: 'D触发器', desc: '时钟控制存储', type:'circuit', gate:'D_FF' },
+  register4: { name: '4位寄存器', desc: '存储4位数据', type:'circuit', gate:'REG4' },
+};
+
+const LEVELS = [
+  { id:1, name:'1. 滑翔机', patterns:['glider','lwss','mwss','hwss','blinker','block','pulsar'],
+    info:'<h4>滑翔机与飞船</h4><p>滑翔机(Glider)是Conway生命游戏中最小的移动图案，仅由5个细胞组成，每4代沿对角线移动1格。</p><p>飞船(Spaceship)沿正交方向移动。LWSS是最小的正交飞船。</p><p><b>操作：</b>点击放置图案，拖拽平移，滚轮缩放。▶播放观察运动。</p>' },
+  { id:2, name:'2. 图灵完备', patterns:['gliderGun','rpentomino','acorn','diehard'],
+    info:'<h4>图灵完备性</h4><p>Conway生命游戏已被证明是<b>图灵完备</b>的——理论上可以模拟任何计算。</p><p><code>Gosper滑翔机枪</code>周期性产生滑翔机，提供无限信号流。这是构建逻辑门的基础——滑翔机流代表"1"，无滑翔机代表"0"。</p><p><b>R-五联骨牌</b>仅5个细胞却能存活1103代，展示了涌现复杂性。</p>' },
+  { id:3, name:'3. 逻辑门', patterns:['notGate','andGate','orGate','nandGate','xorGate'],
+    info:'<h4>逻辑门</h4><p>在GoL中，滑翔机流代表信号。两个滑翔机流相遇时发生碰撞——通过精心设计碰撞几何，可以实现布尔逻辑。</p><p><code>NAND门</code>是<b>万能门</code>：仅用NAND门就能构建AND、OR、NOT、XOR等所有逻辑门，进而构建加法器和CPU。</p><p>下方的真值表展示每种门的逻辑行为。点击输入位切换0/1。</p>' },
+  { id:4, name:'4. 加法器+寄存器', patterns:['halfAdder','fullAdder','fourBitAdder','srLatch','dFlipFlop','register4'],
+    info:'<h4>加法器与寄存器</h4><p><b>半加器</b>：XOR计算和位，AND计算进位。<br><b>全加器</b>：两个半加器 + OR门，处理低位进位。<br><b>4位加法器</b>：4个全加器级联，实现4位二进制加法。</p><p><b>SR锁存器</b>：两个NAND门交叉连接，能存储1位信息——这是<b>内存</b>的基础！<br><b>D触发器</b>：时钟控制的锁存器，构成<b>寄存器</b>。</p>' },
+  { id:5, name:'5. 扩展CPU', patterns:[],
+    info:'<h4>扩展CPU - 图灵完备</h4><p>将加法器(ALU)、寄存器(寄存器文件)、内存(RAM)和控制单元组合，我们得到了一个完整的CPU。</p><p>右侧的CPU模拟器支持：算术运算(ADD/SUB)、逻辑运算(AND/OR/NOT)、条件跳转(JZ/JNZ)、内存读写。</p><p>这就是图灵完备的——它可以计算任何可计算函数！</p><p>试着修改汇编程序，观察CPU执行过程。</p>' },
+  { id:6, name:'6. 完整CPU', patterns:[],
+    info:'<h4>完整CPU - 通用计算</h4><p>扩展CPU增加了更多功能：比较(CMP)、无条件跳转(JMP)等。</p><p>试试下面的示例程序：<br><code>; 倒计时 5→0<br>LOAD_A 5<br>LOAD_B 1<br>STORE_C 0<br>OUTPUT A<br>SUB A B<br>LOAD_C 0<br>JNZ 2<br>HALT</code></p><p>这个CPU能模拟任何图灵机，证明生命游戏的计算通用性。</p>' },
+];
+
+// ============================================================================
+// GoL Renderer
+// ============================================================================
+class GoLRenderer {
+  constructor(canvas, gol) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.gol = gol;
+    this.cellSize = 6;
+    this.ox = 0; this.oy = 0;
+    this.dragging = false;
+    this.lastMouse = null;
+    this.placing = null;
+    this._setupEvents();
+    this.resize();
   }
-  currentRow1d++; history1d.push(nxt);
-  grid.fill(0);
-  for (let r = 0; r < history1d.length; r++) for (let x = 0; x < cols; x++) {
-    const gy = rows - history1d.length + r;
-    if (gy >= 0) grid[gy * cols + x] = history1d[r][x];
+  resize() {
+    const r = this.canvas.parentElement.getBoundingClientRect();
+    this.canvas.width = r.width;
+    this.canvas.height = r.height;
+    this.draw();
   }
-  generation++;
-}
-function step() { mode === 'life' ? stepLife() : step1D(); updateStats(); }
-function lerpColor(c1, c2, t) {
-  const p = (s, i) => parseInt(s.slice(i, i+2), 16);
-  const r = Math.round(p(c1,1)+(p(c2,1)-p(c1,1))*t);
-  const g = Math.round(p(c1,3)+(p(c2,3)-p(c1,3))*t);
-  const b = Math.round(p(c1,5)+(p(c2,5)-p(c1,5))*t);
-  return 'rgb('+r+','+g+','+b+')';
-}
-function draw() {
-  const th = themes[currentTheme];
-  ctx.fillStyle = th.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (cellSize >= 6) {
-    ctx.strokeStyle = th.grid; ctx.lineWidth = 0.5;
-    for (let x = 0; x <= cols; x++) { ctx.beginPath(); ctx.moveTo(x*cellSize,0); ctx.lineTo(x*cellSize,canvas.height); ctx.stroke(); }
-    for (let y = 0; y <= rows; y++) { ctx.beginPath(); ctx.moveTo(0,y*cellSize); ctx.lineTo(canvas.width,y*cellSize); ctx.stroke(); }
+  _setupEvents() {
+    const c = this.canvas;
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      const zf = e.deltaY < 0 ? 1.2 : 1/1.2;
+      const mx = e.offsetX, my = e.offsetY;
+      const wx = (mx - this.ox) / this.cellSize;
+      const wy = (my - this.oy) / this.cellSize;
+      this.cellSize = Math.max(1, Math.min(40, this.cellSize * zf));
+      this.ox = mx - wx * this.cellSize;
+      this.oy = my - wy * this.cellSize;
+      this.draw();
+    }, {passive:false});
+    c.addEventListener('mousedown', e => {
+      if (e.button === 0 && this.placing) {
+        const [gx, gy] = this._screenToGrid(e.offsetX, e.offsetY);
+        this.gol.load(this.placing.cells, gx, gy);
+        this.placing = null;
+        this.draw();
+        return;
+      }
+      if (e.button === 0 && !this.placing) {
+        const [gx, gy] = this._screenToGrid(e.offsetX, e.offsetY);
+        this.gol.toggle(gx, gy);
+        this.draw();
+        return;
+      }
+      this.dragging = true;
+      this.lastMouse = [e.offsetX, e.offsetY];
+    });
+    c.addEventListener('mousemove', e => {
+      if (this.dragging) {
+        this.ox += e.offsetX - this.lastMouse[0];
+        this.oy += e.offsetY - this.lastMouse[1];
+        this.lastMouse = [e.offsetX, e.offsetY];
+        this.draw();
+      }
+    });
+    c.addEventListener('mouseup', () => { this.dragging = false; });
+    c.addEventListener('mouseleave', () => { this.dragging = false; });
+    c.addEventListener('contextmenu', e => e.preventDefault());
   }
-  const gap = cellSize >= 6 ? 1 : 0;
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    if (grid[y * cols + x]) {
-      ctx.fillStyle = lerpColor(th.alive, th.alive2, (x/cols+y/rows)%1);
-      ctx.fillRect(x*cellSize+gap, y*cellSize+gap, cellSize-gap*2, cellSize-gap*2);
+  _screenToGrid(sx, sy) {
+    return [Math.floor((sx - this.ox) / this.cellSize), Math.floor((sy - this.oy) / this.cellSize)];
+  }
+  draw() {
+    const {ctx, canvas, gol, cellSize} = this;
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, w, h);
+    // grid lines
+    if (cellSize >= 4) {
+      ctx.strokeStyle = '#151c28';
+      ctx.lineWidth = 0.5;
+      const startX = this.ox % cellSize;
+      const startY = this.oy % cellSize;
+      ctx.beginPath();
+      for (let x = startX; x < w; x += cellSize) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = startY; y < h; y += cellSize) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+    }
+    // cells
+    ctx.fillStyle = '#00ff88';
+    const gap = cellSize >= 4 ? 0.5 : 0;
+    const cs = cellSize - gap * 2;
+    for (let y = 0; y < gol.h; y++) {
+      for (let x = 0; x < gol.w; x++) {
+        if (gol.grid[y * gol.w + x]) {
+          ctx.fillRect(this.ox + x * cellSize + gap, this.oy + y * cellSize + gap, cs, cs);
+        }
+      }
+    }
+    // ghost pattern
+    if (this.placing) {
+      ctx.fillStyle = 'rgba(0,255,136,0.3)';
+      for (const [x, y] of this.placing.cells) {
+        ctx.fillRect(this.ox + x * cellSize + gap, this.oy + y * cellSize + gap, cs, cs);
+      }
     }
   }
 }
-function animate(ts) {
-  if (!running) return;
-  if (ts - lastTime >= 1000/speed) { step(); draw(); lastTime = ts; }
-  animId = requestAnimationFrame(animate);
-}
-function toggleRun() {
-  running = !running;
-  const btn = document.getElementById('btnPlay');
-  if (running) { btn.textContent = '⏸ 暂停'; lastTime = performance.now(); animId = requestAnimationFrame(animate); }
-  else { btn.textContent = '▶ 运行'; if (animId) cancelAnimationFrame(animId); }
-}
-function getCellPos(e) {
-  const r = canvas.getBoundingClientRect();
-  return { x: Math.max(0, Math.min(cols-1, Math.floor((e.clientX-r.left)/cellSize))),
-           y: Math.max(0, Math.min(rows-1, Math.floor((e.clientY-r.top)/cellSize))) };
-}
-canvas.addEventListener('mousedown', e => { isDrawing=true; const p=getCellPos(e); drawValue=grid[p.y*cols+p.x]?0:1; grid[p.y*cols+p.x]=drawValue; draw(); updateStats(); });
-canvas.addEventListener('mousemove', e => { if(!isDrawing)return; const p=getCellPos(e); grid[p.y*cols+p.x]=drawValue; draw(); updateStats(); });
-canvas.addEventListener('mouseup', () => isDrawing=false);
-canvas.addEventListener('mouseleave', () => isDrawing=false);
-canvas.addEventListener('touchstart', e => { e.preventDefault(); const p=getCellPos(e.touches[0]); isDrawing=true; drawValue=grid[p.y*cols+p.x]?0:1; grid[p.y*cols+p.x]=drawValue; draw(); updateStats(); });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!isDrawing)return; const p=getCellPos(e.touches[0]); grid[p.y*cols+p.x]=drawValue; draw(); updateStats(); });
-canvas.addEventListener('touchend', () => isDrawing=false);
-document.addEventListener('keydown', e => {
-  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
-  switch(e.code){ case'Space':e.preventDefault();toggleRun();break; case'KeyN':step();draw();break; case'KeyC':clearGrid();draw();break; case'KeyR':randomize();break; }
-});
-document.getElementById('btnPlay').addEventListener('click', toggleRun);
-document.getElementById('btnStep').addEventListener('click', () => { step(); draw(); });
-document.getElementById('btnClear').addEventListener('click', () => { clearGrid(); draw(); });
-document.getElementById('btnRandom').addEventListener('click', randomize);
-document.getElementById('modeSelect').addEventListener('change', e => {
-  mode=e.target.value; document.getElementById('ruleGroup').style.display=mode==='1d'?'flex':'none';
-  clearGrid(); if(mode==='1d'){grid[Math.floor(cols/2)]=1;history1d=[grid.slice()];} draw(); updateStats();
-});
-document.getElementById('ruleNum').addEventListener('input', e => {
-  rule1d=Math.max(0,Math.min(255,parseInt(e.target.value)||0));
-  document.getElementById('ruleBits').textContent=rule1d.toString(2).padStart(8,'0');
-  clearGrid(); if(mode==='1d'){grid[Math.floor(cols/2)]=1;history1d=[grid.slice()];} draw();
-});
-document.getElementById('gridSize').addEventListener('change', e => {
-  cellSize=parseInt(e.target.value); const w=running; if(running)toggleRun();
-  resizeCanvas(); clearGrid(); if(mode==='1d'){grid[Math.floor(cols/2)]=1;history1d=[grid.slice()];} draw(); updateStats();
-});
-document.getElementById('speedSlider').addEventListener('input', e => { speed=parseInt(e.target.value); document.getElementById('speedVal').textContent=speed; });
-document.querySelectorAll('.color-swatch').forEach(s => s.addEventListener('click', () => {
-  document.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('active'));
-  s.classList.add('active'); currentTheme=s.dataset.theme; draw();
-}));
-document.getElementById('btnPresets').addEventListener('click', () => document.getElementById('presetsPanel').classList.toggle('show'));
-document.addEventListener('click', e => { if(!e.target.closest('#btnPresets')&&!e.target.closest('#presetsPanel'))document.getElementById('presetsPanel').classList.remove('show'); });
 
-const presets = {
-  glider:[[0,1,0],[0,0,1],[1,1,1]],
-  lwss:[[0,1,0,0,1],[1,0,0,0,0],[1,0,0,0,1],[1,1,1,1,0]],
-  pulsar:[[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0]],
-  pentadecathlon:[[0,0,1,0,0,0,0,1,0,0],[1,1,0,1,1,1,1,0,1,1],[0,0,1,0,0,0,0,1,0,0]],
-  acorn:[[0,1,0,0,0,0,0],[0,0,0,1,0,0,0],[1,1,0,0,1,1,1]],
-  rpentomino:[[0,1,1],[1,1,0],[0,1,0]],
-  diehard:[[0,0,0,0,0,0,1,0],[1,1,0,0,0,0,0,0],[0,1,0,0,0,1,1,1]],
-  gosper:[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],[0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],[1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]
-};
-function placePreset(name) {
-  clearGrid(); const pat=presets[name]; if(!pat)return;
-  const sx=Math.floor((cols-pat[0].length)/2), sy=Math.floor((rows-pat.length)/2);
-  for(let y=0;y<pat.length;y++) for(let x=0;x<pat[0].length;x++) {
-    const gx=sx+x, gy=sy+y;
-    if(gx>=0&&gx<cols&&gy>=0&&gy<rows) grid[gy*cols+gx]=pat[y][x];
+// ============================================================================
+// Circuit Renderer (Levels 3-4)
+// ============================================================================
+class CircuitRenderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.currentGate = null;
+    this.inputs = { A: 0, B: 0 };
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
   }
-  draw(); updateStats();
+  resize() {
+    const r = this.canvas.parentElement.getBoundingClientRect();
+    this.canvas.width = r.width;
+    this.canvas.height = r.height;
+    this.draw();
+  }
+  setGate(gate) {
+    this.currentGate = gate;
+    this.draw();
+  }
+  draw() {
+    const {ctx, canvas} = this;
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!this.currentGate) {
+      ctx.fillStyle = '#6b7a94';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('选择一个图案查看电路图', canvas.width/2, canvas.height/2);
+      return;
+    }
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    this._drawGate(this.currentGate, cx, cy);
+  }
+  _drawGate(type, cx, cy) {
+    const g = this;
+    const ctx = g.ctx;
+    const {A, B} = g.inputs;
+    let out;
+
+    const drawWire = (x1,y1,x2,y2,on) => {
+      ctx.strokeStyle = on ? '#00ff88' : '#2a3a52';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    };
+    const drawIO = (x,y,label,val,on) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI*2);
+      ctx.fillStyle = on ? 'rgba(0,255,136,0.2)' : 'rgba(255,255,255,0.04)';
+      ctx.fill();
+      ctx.strokeStyle = on ? '#00ff88' : '#2a3a52';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = on ? '#00ff88' : '#6b7a94';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(val !== undefined ? val : label, x, y);
+    };
+    const gateBody = (x,y,w,h,label) => {
+      ctx.fillStyle = 'rgba(0,170,255,0.06)';
+      ctx.strokeStyle = '#00aaff';
+      ctx.lineWidth = 2;
+      const r = 6;
+      ctx.beginPath();
+      ctx.roundRect(x-w/2, y-h/2, w, h, r);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#00aaff';
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, y);
+    };
+
+    const sx = cx - 200, ex = cx + 200;
+
+    if (type === 'NOT') {
+      out = A ? 0 : 1;
+      drawIO(sx, cy, 'A', A, A);
+      drawWire(sx+14, cy, cx-30, cy, A);
+      gateBody(cx, cy, 80, 40, 'NOT');
+      drawWire(cx+40, cy, ex-14, cy, out);
+      drawIO(ex, cy, 'Q', out, out);
+    } else if (type === 'AND') {
+      out = (A & B) ? 1 : 0;
+      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
+      drawWire(sx+14, cy-40, cx-30, cy-15, A);
+      drawWire(sx+14, cy+40, cx-30, cy+15, B);
+      gateBody(cx, cy, 80, 50, 'AND');
+      drawWire(cx+40, cy, ex-14, cy, out);
+      drawIO(ex, cy, 'Q', out, out);
+    } else if (type === 'OR') {
+      out = (A | B) ? 1 : 0;
+      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
+      drawWire(sx+14, cy-40, cx-30, cy-15, A);
+      drawWire(sx+14, cy+40, cx-30, cy+15, B);
+      gateBody(cx, cy, 80, 50, 'OR');
+      drawWire(cx+40, cy, ex-14, cy, out);
+      drawIO(ex, cy, 'Q', out, out);
+    } else if (type === 'NAND') {
+      out = (A & B) ? 0 : 1;
+      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
+      drawWire(sx+14, cy-40, cx-30, cy-15, A);
+      drawWire(sx+14, cy+40, cx-30, cy+15, B);
+      gateBody(cx, cy, 80, 50, 'NAND');
+      // small circle for inversion
+      ctx.beginPath(); ctx.arc(cx+43, cy, 5, 0, Math.PI*2);
+      ctx.strokeStyle='#ff4466'; ctx.lineWidth=2; ctx.stroke();
+      drawWire(cx+50, cy, ex-14, cy, out);
+      drawIO(ex, cy, 'Q', out, out);
+    } else if (type === 'XOR') {
+      out = (A ^ B) ? 1 : 0;
+      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
+      drawWire(sx+14, cy-40, cx-30, cy-15, A);
+      drawWire(sx+14, cy+40, cx-30, cy+15, B);
+      gateBody(cx, cy, 80, 50, 'XOR');
+      drawWire(cx+40, cy, ex-14, cy, out);
+      drawIO(ex, cy, 'Q', out, out);
+    } else if (type === 'HALF_ADDER') {
+      const sum = A ^ B, carry = A & B;
+      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
+      drawWire(sx+14, cy-40, cx-40, cy-15, A);
+      drawWire(sx+14, cy+40, cx-40, cy+15, B);
+      gateBody(cx, cy, 100, 60, 'HALF ADDER');
+      drawWire(cx+50, cy-15, ex-14, cy-50, sum);
+      drawIO(ex, cy-50, 'S', sum, sum);
+      drawWire(cx+50, cy+15, ex-14, cy+50, carry);
+      drawIO(ex, cy+50, 'C', carry, carry);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif';
+      ctx.textAlign='left'; ctx.fillText('Sum = A⊕B', ex+25, cy-50);
+      ctx.fillText('Carry = A·B', ex+25, cy+50);
+    } else if (type === 'FULL_ADDER') {
+      const Cin = this.inputs.Cin || 0;
+      const s1 = A ^ B, c1 = A & B;
+      const sum = s1 ^ Cin, c2 = s1 & Cin;
+      const carry = c1 | c2;
+      drawIO(sx, cy-60, 'A', A, A);
+      drawIO(sx, cy, 'B', B, B);
+      drawIO(sx, cy+60, 'Cin', Cin, Cin);
+      drawWire(sx+14, cy-60, cx-50, cy-25, A);
+      drawWire(sx+14, cy, cx-50, cy, B);
+      drawWire(sx+14, cy+60, cx-50, cy+25, Cin);
+      gateBody(cx, cy, 120, 70, 'FULL ADDER');
+      drawWire(cx+60, cy-20, ex-14, cy-50, sum);
+      drawIO(ex, cy-50, 'S', sum, sum);
+      drawWire(cx+60, cy+20, ex-14, cy+50, carry);
+      drawIO(ex, cy+50, 'Cout', carry, carry);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif';
+      ctx.textAlign='left'; ctx.fillText('S = A⊕B⊕Cin', ex+35, cy-50);
+      ctx.fillText('Cout = (A·B)|(Cin·(A⊕B))', ex+35, cy+50);
+      // Cin toggle button area
+      ctx.fillStyle='#1e2a42'; ctx.fillRect(sx-20, cy+75, 50, 24);
+      ctx.fillStyle=Cin?'#00ff88':'#6b7a94'; ctx.font='12px monospace'; ctx.textAlign='center';
+      ctx.fillText('Cin='+Cin, sx+5, cy+90);
+    } else if (type === 'ADDER4') {
+      const A4 = A, B4 = B;
+      const bits_a = [(A4>>3)&1,(A4>>2)&1,(A4>>1)&1,A4&1];
+      const bits_b = [(B4>>3)&1,(B4>>2)&1,(B4>>1)&1,B4&1];
+      let cin = 0, result = 0;
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+      for (let i = 0; i < 4; i++) {
+        const bx = cx - 120 + i * 80;
+        const s = bits_a[3-i] ^ bits_b[3-i] ^ cin;
+        const c = (bits_a[3-i] & bits_b[3-i]) | (cin & (bits_a[3-i] ^ bits_b[3-i]));
+        result = (result << 1) | s;
+        gateBody(bx, cy, 60, 40, 'FA'+i);
+        ctx.fillStyle='#00aaff'; ctx.font='10px monospace';
+        ctx.fillText('a='+bits_a[3-i]+' b='+bits_b[3-i], bx, cy+30);
+        ctx.fillText('cin='+cin+' s='+s, bx, cy+42);
+        cin = c;
+      }
+      drawIO(cx-240, cy-40, 'A='+A4, A4, A4);
+      drawIO(cx-240, cy+40, 'B='+B4, B4, B4);
+      drawIO(cx+200, cy, 'R='+result, result, result);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+      ctx.fillText(A4+' + '+B4+' = '+result+' (溢出:'+(cin?1:0)+')', cx-240, cy+80);
+    } else if (type === 'SR_LATCH') {
+      const S = A, R = B;
+      let Q = this._srQ || 0, Qn = this._srQn || 1;
+      if (S && !R) { Q = 1; Qn = 0; }
+      else if (!S && R) { Q = 0; Qn = 1; }
+      else if (S && R) { Q = 1; Qn = 1; }
+      this._srQ = Q; this._srQn = Qn;
+      drawIO(sx, cy-40, 'S', S, S); drawIO(sx, cy+40, 'R', R, R);
+      // Two NAND gates
+      gateBody(cx-40, cy-30, 60, 36, 'NAND');
+      gateBody(cx-40, cy+30, 60, 36, 'NAND');
+      drawWire(sx+14, cy-40, cx-70, cy-30, S);
+      drawWire(sx+14, cy+40, cx-70, cy+30, R);
+      // Cross feedback
+      drawWire(cx-10, cy-30, cx+30, cy+18, Q);
+      drawWire(cx-10, cy+30, cx+30, cy-18, Qn);
+      gateBody(cx+80, cy, 60, 70, 'SR');
+      drawWire(cx+50, cy-15, cx+60, cy-15, Q);
+      drawWire(cx+50, cy+15, cx+60, cy+15, Qn);
+      drawIO(ex, cy-30, 'Q', Q, Q);
+      drawIO(ex, cy+30, "Q'", Qn, Qn);
+      drawWire(cx+110, cy-15, ex-14, cy-30, Q);
+      drawWire(cx+110, cy+15, ex-14, cy+30, Qn);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('S=1,R=0 → 存1  S=0,R=1 → 存0  S=0,R=0 → 保持', sx-20, cy+100);
+      ctx.fillText('这就是1位内存！', sx-20, cy+116);
+    } else if (type === 'D_FF') {
+      const D = A, CLK = B;
+      let Q = this._dffQ || 0;
+      if (CLK) Q = D;
+      this._dffQ = Q;
+      drawIO(sx, cy-40, 'D', D, D); drawIO(sx, cy+40, 'CLK', CLK, CLK);
+      gateBody(cx, cy, 100, 60, 'D Flip-Flop');
+      drawWire(sx+14, cy-40, cx-50, cy-15, D);
+      drawWire(sx+14, cy+40, cx-50, cy+15, CLK);
+      drawWire(cx+50, cy, ex-14, cy, Q);
+      drawIO(ex, cy, 'Q', Q, Q);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('CLK=1时 Q←D, CLK=0时 保持', sx-20, cy+80);
+    } else if (type === 'REG4') {
+      const val = A;
+      const WE = B;
+      let stored = this._reg4val !== undefined ? this._reg4val : 0;
+      if (WE) stored = val;
+      this._reg4val = stored;
+      const bits = [(stored>>3)&1,(stored>>2)&1,(stored>>1)&1,stored&1];
+      drawIO(sx, cy-40, 'D='+val, val, val);
+      drawIO(sx, cy+40, 'WE='+WE, WE, WE);
+      gateBody(cx, cy, 120, 60, '4-BIT REG');
+      // Show bits
+      for (let i = 0; i < 4; i++) {
+        const bx = cx + 70 + i * 36;
+        ctx.fillStyle = bits[i] ? 'rgba(0,255,136,0.2)' : 'rgba(255,255,255,0.04)';
+        ctx.fillRect(bx-14, cy-10, 28, 20);
+        ctx.strokeStyle = bits[i] ? '#00ff88' : '#2a3a52';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx-14, cy-10, 28, 20);
+        ctx.fillStyle = bits[i] ? '#00ff88' : '#6b7a94';
+        ctx.font = '12px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(bits[i], bx, cy);
+      }
+      drawWire(sx+14, cy-40, cx-60, cy-15, val);
+      drawWire(sx+14, cy+40, cx-60, cy+15, WE);
+      drawIO(ex, cy, 'Q='+stored, stored, stored);
+      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('WE=1时加载新值，WE=0时保持', sx-20, cy+80);
+      ctx.fillText('4个D触发器并联 = 4位寄存器', sx-20, cy+96);
+    }
+    // Draw truth table
+    this._drawTruthTable(type, ctx, canvas.width, canvas.height);
+  }
+  _drawTruthTable(type, ctx, cw, ch) {
+    const tables = {
+      AND:  [[0,0,0],[0,1,0],[1,0,0],[1,1,1]],
+      OR:   [[0,0,0],[0,1,1],[1,0,1],[1,1,1]],
+      NAND: [[0,0,1],[0,1,1],[1,0,1],[1,1,0]],
+      XOR:  [[0,0,0],[0,1,1],[1,0,1],[1,1,0]],
+      NOT:  [[0,1],[1,0]],
+    };
+    const t = tables[type];
+    if (!t) return;
+    const tx = 40, ty = ch - 40 - t.length * 22;
+    ctx.fillStyle = 'rgba(0,170,255,0.06)';
+    ctx.fillRect(tx-8, ty-24, 160, 28 + t.length * 22);
+    ctx.fillStyle = '#00aaff'; ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('真值表', tx, ty-8);
+    const cols = type === 'NOT' ? ['A','Q'] : ['A','B','Q'];
+    cols.forEach((c, i) => {
+      ctx.fillStyle = '#00aaff'; ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center'; ctx.fillText(c, tx + 20 + i * 40, ty + 8);
+    });
+    t.forEach((row, ri) => {
+      row.forEach((v, ci) => {
+        ctx.fillStyle = v ? '#00ff88' : '#6b7a94';
+        ctx.font = '11px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(v, tx + 20 + ci * 40, ty + 28 + ri * 22);
+      });
+    });
+  }
 }
-document.querySelectorAll('.preset-item[data-preset]').forEach(i => i.addEventListener('click', () => {
-  document.getElementById('modeSelect').value='life'; mode='life'; document.getElementById('ruleGroup').style.display='none';
-  placePreset(i.dataset.preset); document.getElementById('presetsPanel').classList.remove('show');
-}));
-document.querySelectorAll('.preset-item[data-rule]').forEach(i => i.addEventListener('click', () => {
-  document.getElementById('modeSelect').value='1d'; mode='1d'; document.getElementById('ruleGroup').style.display='flex';
-  rule1d=parseInt(i.dataset.rule); document.getElementById('ruleNum').value=rule1d;
-  document.getElementById('ruleBits').textContent=rule1d.toString(2).padStart(8,'0');
-  clearGrid(); grid[Math.floor(cols/2)]=1; history1d=[grid.slice()]; draw(); updateStats();
-  document.getElementById('presetsPanel').classList.remove('show');
-}));
-function updateStats() {
-  document.getElementById('genCount').textContent=generation;
-  let a=0; for(let i=0;i<grid.length;i++) if(grid[i])a++;
-  document.getElementById('cellCount').textContent=a;
+
+// ============================================================================
+// CPU Simulator (Levels 5-6)
+// ============================================================================
+class CPUSimulator {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.regA = 0; this.regB = 0; this.regC = 0;
+    this.pc = 0; this.running = false; this.halted = false;
+    this.mem = new Array(64).fill(0);
+    this.program = [];
+    this.output = [];
+  }
+  parse(code) {
+    this.program = code.trim().split('\n')
+      .map(l => l.replace(/;.*$/, '').trim())
+      .filter(l => l.length > 0)
+      .map(l => l.split(/\s+/));
+  }
+  getReg(name) {
+    if (name === 'A' || name === 'a') return this.regA;
+    if (name === 'B' || name === 'b') return this.regB;
+    if (name === 'C' || name === 'c') return this.regC;
+    return 0;
+  }
+  setReg(name, val) {
+    if (name === 'A' || name === 'a') this.regA = val & 0xFF;
+    else if (name === 'B' || name === 'b') this.regB = val & 0xFF;
+    else if (name === 'C' || name === 'c') this.regC = val & 0xFF;
+  }
+  step() {
+    if (this.halted || this.pc >= this.program.length) {
+      this.halted = true; this.running = false;
+      return false;
+    }
+    const inst = this.program[this.pc];
+    const op = inst[0].toUpperCase();
+    this.pc++;
+    switch (op) {
+      case 'LOAD_A': this.regA = (parseInt(inst[1]) || 0) & 0xFF; break;
+      case 'LOAD_B': this.regB = (parseInt(inst[1]) || 0) & 0xFF; break;
+      case 'ADD': this.regC = (this.getReg(inst[1]) + this.getReg(inst[2])) & 0xFF; break;
+      case 'SUB': this.regC = (this.getReg(inst[1]) - this.getReg(inst[2])) & 0xFF; break;
+      case 'AND': this.regC = (this.getReg(inst[1]) & this.getReg(inst[2])) & 0xFF; break;
+      case 'OR':  this.regC = (this.getReg(inst[1]) | this.getReg(inst[2])) & 0xFF; break;
+      case 'NOT': this.regC = (~this.getReg(inst[1])) & 0xFF; break;
+      case 'STORE_C': { const addr = parseInt(inst[1]) || 0; this.mem[addr & 63] = this.regC; break; }
+      case 'LOAD_C': { const addr = parseInt(inst[1]) || 0; this.regC = this.mem[addr & 63]; break; }
+      case 'JMP': this.pc = parseInt(inst[1]) || 0; break;
+      case 'JZ': if (this.regC === 0) this.pc = parseInt(inst[1]) || 0; break;
+      case 'JNZ': if (this.regC !== 0) this.pc = parseInt(inst[1]) || 0; break;
+      case 'CMP': {
+        const diff = this.getReg(inst[1]) - this.getReg(inst[2]);
+        this.regC = diff & 0xFF;
+        break;
+      }
+      case 'OUTPUT': this.output.push(this.getReg(inst[1])); break;
+      case 'HALT': this.halted = true; this.running = false; break;
+    }
+    return !this.halted;
+  }
+  run() {
+    this.running = true;
+    let steps = 0;
+    while (this.running && steps < 10000) {
+      if (!this.step()) break;
+      steps++;
+    }
+  }
 }
-window.addEventListener('resize', () => { const w=running; if(running)toggleRun(); resizeCanvas(); clearGrid(); draw(); updateStats(); });
-init(); placePreset('glider');
+
+// ============================================================================
+// Main Application
+// ============================================================================
+const gol = new GameOfLife(300, 300);
+const canvas = document.getElementById('golCanvas');
+const renderer = new GoLRenderer(canvas, gol);
+const circuitCanvas = document.getElementById('circuitCanvas');
+const circuit = new CircuitRenderer(circuitCanvas);
+const cpu = new CPUSimulator();
+
+let currentLevel = 1;
+let playing = false;
+let playInterval = null;
+let speed = 5;
+
+// Build level tabs
+const levelsEl = document.getElementById('levels');
+LEVELS.forEach(lv => {
+  const tab = document.createElement('div');
+  tab.className = 'ltab';
+  tab.textContent = lv.name;
+  tab.dataset.id = lv.id;
+  tab.addEventListener('click', () => switchLevel(lv.id));
+  levelsEl.appendChild(tab);
+});
+
+function switchLevel(id) {
+  currentLevel = id;
+  stopPlaying();
+  document.querySelectorAll('.ltab').forEach(t => t.classList.toggle('active', +t.dataset.id === id));
+  const lv = LEVELS.find(l => l.id === id);
+
+  // Show/hide panels
+  document.getElementById('canvas-wrap').style.display = id <= 2 ? '' : 'none';
+  document.getElementById('circuit-panel').style.display = (id === 3 || id === 4) ? '' : 'none';
+  document.getElementById('cpu-panel').style.display = id >= 5 ? '' : 'none';
+
+  // Build pattern list
+  const pl = document.getElementById('patternList');
+  pl.innerHTML = '';
+  lv.patterns.forEach(pk => {
+    const pat = P[pk];
+    if (!pat) return;
+    const btn = document.createElement('button');
+    btn.className = 'pat-btn';
+    btn.innerHTML = `${pat.name}<div class="desc">${pat.desc}</div>`;
+    btn.addEventListener('click', () => selectPattern(pk));
+    pl.appendChild(btn);
+  });
+
+  // Update info
+  document.getElementById('info').innerHTML = lv.info;
+
+  // Circuit/CPU resize
+  if (id === 3 || id === 4) circuit.resize();
+  if (id === 5 || id === 6) updateCPUDisplay();
+
+  if (id <= 2) { gol.clear(); renderer.draw(); }
+}
+
+function selectPattern(key) {
+  const pat = P[key];
+  document.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+  event.target.closest('.pat-btn').classList.add('active');
+
+  if (pat.type === 'circuit') {
+    circuit.setGate(pat.gate);
+    circuit.inputs = { A: 0, B: 0 };
+    circuit._srQ = 0; circuit._srQn = 1; circuit._dffQ = 0; circuit._reg4val = 0;
+    circuit.draw();
+    // Add click handler for inputs
+    circuitCanvas.onclick = e => {
+      const cx = circuitCanvas.width / 2;
+      const sx = cx - 200;
+      const cy = circuitCanvas.height / 2;
+      const mx = e.offsetX, my = e.offsetY;
+      // Toggle A
+      if (Math.hypot(mx - sx, my - (cy - 40)) < 20) {
+        circuit.inputs.A ^= 1;
+      }
+      // Toggle B
+      if (Math.hypot(mx - sx, my - (cy + 40)) < 20) {
+        circuit.inputs.B ^= 1;
+      }
+      // Toggle Cin for full adder
+      if (pat.gate === 'FULL_ADDER' && mx > sx - 25 && mx < sx + 30 && my > cy + 70 && my < cy + 100) {
+        circuit.inputs.Cin = (circuit.inputs.Cin || 0) ^ 1;
+      }
+      circuit.draw();
+    };
+    return;
+  }
+
+  // GoL pattern
+  if (currentLevel <= 2) {
+    gol.clear();
+    const ox = Math.floor(gol.w / 2 - 5);
+    const oy = Math.floor(gol.h / 2 - 5);
+    gol.load(pat.cells, ox, oy);
+    renderer.ox = -gol.w * renderer.cellSize / 2 + canvas.width / 2;
+    renderer.oy = -gol.h * renderer.cellSize / 2 + canvas.height / 2;
+    renderer.draw();
+    document.getElementById('genLabel').textContent = 'Gen: 0';
+  }
+}
+
+// Controls
+function startPlaying() {
+  if (playInterval) clearInterval(playInterval);
+  playing = true;
+  document.getElementById('btnPlay').textContent = '⏸';
+  const delay = speed === 'Max' ? 0 : Math.max(5, 200 / parseInt(speed));
+  playInterval = setInterval(() => {
+    gol.step();
+    renderer.draw();
+    document.getElementById('genLabel').textContent = `Gen: ${gol.gen} | Alive: ${gol.countAlive()}`;
+  }, delay);
+}
+function stopPlaying() {
+  playing = false;
+  document.getElementById('btnPlay').textContent = '▶';
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+}
+
+document.getElementById('btnPlay').addEventListener('click', () => playing ? stopPlaying() : startPlaying());
+document.getElementById('btnStep').addEventListener('click', () => {
+  stopPlaying();
+  gol.step();
+  renderer.draw();
+  document.getElementById('genLabel').textContent = `Gen: ${gol.gen} | Alive: ${gol.countAlive()}`;
+});
+document.getElementById('btnClear').addEventListener('click', () => {
+  stopPlaying();
+  gol.clear();
+  renderer.draw();
+  document.getElementById('genLabel').textContent = 'Gen: 0';
+});
+document.getElementById('speedSel').addEventListener('change', e => {
+  speed = e.target.value;
+  if (playing) { stopPlaying(); startPlaying(); }
+});
+document.getElementById('btnZoomIn').addEventListener('click', () => {
+  renderer.cellSize = Math.min(40, renderer.cellSize * 1.3);
+  renderer.draw();
+});
+document.getElementById('btnZoomOut').addEventListener('click', () => {
+  renderer.cellSize = Math.max(1, renderer.cellSize / 1.3);
+  renderer.draw();
+});
+
+// CPU controls
+function updateCPUDisplay() {
+  const regs = document.getElementById('cpuRegs');
+  regs.innerHTML = ['A','B','C'].map(r =>
+    `<div class="reg"><span class="rn">REG_${r}</span><span class="rv">${cpu.getReg(r)}</span></div>`
+  ).join('') + `<div class="reg"><span class="rn">PC</span><span class="rv">${cpu.pc}</span></div>`;
+
+  const memEl = document.getElementById('cpuMem');
+  let memHTML = '';
+  for (let i = 0; i < 32; i++) {
+    const v = cpu.mem[i];
+    const cur = (cpu.pc - 1 === i) ? ' cur' : '';
+    memHTML += `<span class="addr">[${String(i).padStart(2,'0')}]</span> <span class="val${cur}">${v}</span>  `;
+    if (i % 8 === 7) memHTML += '<br>';
+  }
+  memEl.innerHTML = memHTML;
+
+  document.getElementById('cpuState').textContent =
+    `PC: ${cpu.pc} | 运行中: ${cpu.running ? '是' : '否'} | 停机: ${cpu.halted ? '是' : '否'}`;
+
+  document.getElementById('cpuOutput').textContent = '输出: ' + (cpu.output.length ? cpu.output.join(', ') : '(空)');
+}
+
+document.getElementById('cpuRun').addEventListener('click', () => {
+  cpu.reset();
+  cpu.parse(document.getElementById('asmCode').value);
+  cpu.run();
+  updateCPUDisplay();
+});
+document.getElementById('cpuStep').addEventListener('click', () => {
+  if (cpu.halted || cpu.program.length === 0) {
+    cpu.reset();
+    cpu.parse(document.getElementById('asmCode').value);
+  }
+  cpu.step();
+  updateCPUDisplay();
+});
+document.getElementById('cpuReset').addEventListener('click', () => {
+  cpu.reset();
+  updateCPUDisplay();
+});
+
+// Window resize
+window.addEventListener('resize', () => {
+  renderer.resize();
+  if (currentLevel === 3 || currentLevel === 4) circuit.resize();
+});
+
+// Init
+switchLevel(1);
 </script>
 </body>
 </html>
