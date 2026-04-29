@@ -176,7 +176,7 @@ class GameOfLife {
 }
 
 // ============================================================================
-// Pattern rotation utility
+// Pattern utilities
 // ============================================================================
 function rotateCells(cells, times) {
   let r = cells.map(([x,y])=>[x,y]);
@@ -188,18 +188,137 @@ function rotateCells(cells, times) {
   for (const [x,y] of r) { if(x<mx)mx=x; if(y<my2)my2=y; }
   return r.map(([x,y])=>[x-mx,y-my2]);
 }
+function reflectCells(cells) {
+  let mx = 0; for (const [x] of cells) if (x > mx) mx = x;
+  return cells.map(([x,y])=>[mx-x, y]);
+}
+function offsetCells(cells, ox, oy) { return cells.map(([x,y])=>[x+ox,y+oy]); }
+function parseAscii(lines) {
+  const c = [];
+  for (let y = 0; y < lines.length; y++)
+    for (let x = 0; x < lines[y].length; x++)
+      if (lines[y][x] === 'O') c.push([x,y]);
+  return c;
+}
+// Phase-shift: pre-evolve a pattern N generations using a temporary GoL engine
+function phaseShift(cells, gens) {
+  if (gens <= 0) return cells;
+  let mx=0,my=0;
+  for (const [x,y] of cells){if(x>mx)mx=x;if(y>my)my=y;}
+  const pad = gens; // glider moves ~gens/4 cells
+  const w = mx+1+pad*2, h = my+1+pad*2;
+  const g = new Uint8Array(w*h), b = new Uint8Array(w*h);
+  for (const [x,y] of cells) g[(y+pad)*w+(x+pad)]=1;
+  for (let gen=0;gen<gens;gen++){
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let n=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        const nx=x+dx,ny=y+dy;
+        if(nx>=0&&nx<w&&ny>=0&&ny<h)n+=g[ny*w+nx];
+      }
+      b[y*w+x]=g[y*w+x]?(n===2||n===3?1:0):(n===3?1:0);
+    }
+    [g,b].forEach(()=>{}); const tmp=g; g.fill(0); // swap via copy
+    for(let i=0;i<w*h;i++)g[i]=b[i];
+  }
+  const result=[];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+    if(g[y*w+x])result.push([x-pad,y-pad]);
+  return result;
+}
 
 // ============================================================================
-// Pattern Definitions
+// Raw Component Patterns
 // ============================================================================
 const _gunCells = [[24,0],[22,1],[24,1],[12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
   [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],[0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
   [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],[10,6],[16,6],[24,6],
   [11,7],[15,7],[12,8],[13,8]];
-const _gun90 = rotateCells(_gunCells, 1);  // 90° CW
-const _gun180 = rotateCells(_gunCells, 2); // 180°
-const _gun270 = rotateCells(_gunCells, 3); // 270° CW
+
+// Period-60 Gosper Gun (two P30 guns combined for sparser stream)
+// From bespoyasov/binary-full-adder-in-the-game-of-life
+const _gunP60 = parseAscii([
+  '........................O...........',
+  '......................O.O...........',
+  '............OO......OO............OO',
+  '...........O...O....OO............OO',
+  'OO........O.....O...OO..............',
+  'OO........O...O.OO....O.O...........',
+  '..........O.....O.......O...........',
+  '...........O...O....................',
+  '............OO....................',
+]);
+
+// Reflector (stable, redirects glider stream 90°)
+// Based on period-30 stable reflector from LifeWiki
+const _reflector = parseAscii([
+  '........O',
+  '......OOO',
+  '.....O...',
+  '.....OO..',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  'OO.O.OO..',
+  '.........',
+  'O.....O..',
+  '.........',
+  '.OO.OO...',
+  '...O.....',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '.........',
+  '...OO....',
+  '...OO....',
+]);
+
+// Eater (standard 4x4 still life)
 const _eaterCells = [[1,0],[2,0],[0,1],[3,1],[1,2],[2,2],[2,3]];
+
+// Pre-computed rotations
+const _gun90 = rotateCells(_gunCells, 1);
+const _gun180 = rotateCells(_gunCells, 2);
+const _gun270 = rotateCells(_gunCells, 3);
+const _gunP60_90 = rotateCells(_gunP60, 1);
+const _gunP60_180 = rotateCells(_gunP60, 2);
+const _gunP60_270 = rotateCells(_gunP60, 3);
+const _reflector90 = rotateCells(_reflector, 1);
+const _reflector180 = rotateCells(_reflector, 2);
+const _reflector270 = rotateCells(_reflector, 3);
+const _reflectorFlip = reflectCells(_reflector);
+const _reflector90F = reflectCells(_reflector90);
+const _reflector180F = reflectCells(_reflector180);
+const _reflector270F = reflectCells(_reflector270);
 
 const P = {
   // Level 1: Gliders
@@ -237,42 +356,56 @@ const P = {
       return [...new Set(c.map(p=>p.join(',')))].map(s=>s.split(',').map(Number));
     })() },
 
-  // Level 3: GoL building blocks
-  eater: { name: '吞噬者 (Eater)', desc: '静物，可吞噬滑翔机，信号消纳元件',
+  // Level 3: GoL building blocks & real gate implementations
+  eater: { name: '吞噬者 (Eater)', desc: '静物，吞噬滑翔机，信号消纳元件',
     cells: _eaterCells },
-  notGateGol: { name: 'NOT门 (GoL双枪交叉)', desc: '标准枪(SE) + 旋转枪(NW) 的滑翔机流交叉碰撞',
+  reflector: { name: '反射器 (Reflector)', desc: '将滑翔机流偏转90°，信号路由核心元件',
+    cells: _reflector },
+  gunP60: { name: 'P60滑翔机枪', desc: '周期60枪，稀疏流更易控制碰撞时序',
+    cells: _gunP60 },
+  signalPath: { name: '信号通道 (枪→吞噬者)', desc: '枪产生流→吞噬者消纳，观察信号传播',
+    cells: [..._gunCells, ...offsetCells(_eaterCells, 70, 70)] },
+  reflectorDemo: { name: '反射器路由', desc: '枪→反射器偏转→吞噬者，展示90°信号路由',
+    cells: [...offsetCells(_gun270, 0, 0), ...offsetCells(_reflector, 20, 55), ...offsetCells(_eaterCells, 55, 20)] },
+  notGateGol: { name: 'NOT门 (GoL实现)', desc: '时钟枪+输入枪+反射器：输入碰撞时钟→阻断输出',
     cells: (function(){
-      const g1 = _gunCells;
-      const g2 = _gun180.map(([x,y])=>[x+60,y+50]);
-      return [...g1,...g2];
+      const clockGun = offsetCells(reflectCells(_gunP60_270), 38, 1);
+      const inputGun = offsetCells(reflectCells(_gunP60_270), 0, 0);
+      const refl = offsetCells(reflectCells(_reflector), 9, 62);
+      return [...clockGun, ...inputGun, ...refl];
     })() },
-  andGateGol: { name: 'AND门 (GoL三枪)', desc: '三把枪的流交叉实现与门',
+  andGateGol: { name: 'AND门 (GoL实现)', desc: '输入A枪+B枪+时钟枪三流碰撞，仅A=1且B=1时输出',
     cells: (function(){
-      const g1 = _gunCells;
-      const g2 = _gun90.map(([x,y])=>[x+100,y+10]);
-      const g3 = _gun270.map(([x,y])=>[x+10,y+100]);
-      return [...g1,...g2,...g3];
+      const gunA = offsetCells(reflectCells(_gunP60_270), 0, 0);
+      const gunB = offsetCells(reflectCells(_gunP60_270), 128, 0);
+      const clockGun = offsetCells(_gunP60_270, 208, 1);
+      const collector = offsetCells(reflectCells(_eaterCells), 76, 173);
+      return [...gunA, ...gunB, ...clockGun, ...collector];
     })() },
-  nandGateGol: { name: 'NAND门 (GoL双枪+反射)', desc: '两把枪流交叉 + 吞噬者消纳 = 与非门',
+  orGateGol: { name: 'OR门 (GoL实现)', desc: '4枪+2吞噬者：A或B为1时输出信号通过',
     cells: (function(){
-      const g1 = _gunCells;
-      const g2 = _gun90.map(([x,y])=>[x+80,y+20]);
-      const eaters = _eaterCells.map(([x,y])=>[x+120,y+60]);
-      return [...g1,...g2,...eaters];
+      const gunA = offsetCells(reflectCells(_gunP60_270), 0, 0);
+      const gunB = offsetCells(reflectCells(_gunP60_270), 128, 0);
+      const clockGun = offsetCells(_gunP60_270, 208, 1);
+      const outputGun = offsetCells(reflectCells(_gunP60_270), 1, 45);
+      const eat1 = offsetCells(_eaterCells, 145, 161);
+      const eat2 = offsetCells(_eaterCells, 146, 206);
+      return [...gunA, ...gunB, ...clockGun, ...outputGun, ...eat1, ...eat2];
     })() },
-  signalPath: { name: '信号通道 (枪→吞噬者)', desc: '滑翔机枪产生信号流→吞噬者消纳，展示信号传播',
+  xorGateGol: { name: 'XOR门 (GoL实现)', desc: '4枪+反射器：A≠B时输出信号',
     cells: (function(){
-      const gun = _gunCells;
-      const eater = _eaterCells.map(([x,y])=>[x+70,y+70]);
-      return [...gun,...eater];
+      const gunA = offsetCells(reflectCells(_gunP60_270), 48, 2);
+      const gunB = offsetCells(_gunP60_270, 128, 1);
+      const clockGun = offsetCells(_gunP60_270, 168, 44);
+      const outputGun = offsetCells(reflectCells(_gunP60_270), 1, 87);
+      const refl = offsetCells(_reflector, 56, 105);
+      return [...gunA, ...gunB, ...clockGun, ...outputGun, ...refl];
     })() },
-  gliderCollision: { name: '滑翔机碰撞', desc: '两列滑翔机对撞湮灭——信号交互的基础',
+  gliderCollision: { name: '滑翔机碰撞', desc: '两列滑翔机对撞湮灭',
     cells: (function(){
       const se = [[1,0],[2,1],[0,2],[1,2],[2,2]];
       const c = [];
-      // 3 SE-moving gliders in a stream
       for(let i=0;i<3;i++) se.forEach(([x,y])=>c.push([x+8*i+10,y+8*i+10]));
-      // 3 more SE gliders on a converging path
       for(let i=0;i<3;i++) se.forEach(([x,y])=>c.push([x-8*i+30,y+8*i+5]));
       return c;
     })() },
@@ -295,8 +428,8 @@ const LEVELS = [
     info:'<h4>滑翔机与飞船</h4><p>滑翔机(Glider)是Conway生命游戏中最小的移动图案，仅由5个细胞组成，每4代沿对角线移动1格。</p><p>飞船(Spaceship)沿正交方向移动。LWSS是最小的正交飞船。</p><p><b>操作：</b>点击放置图案，拖拽平移，滚轮缩放。▶播放观察运动。</p>' },
   { id:2, name:'2. 图灵完备', patterns:['gliderGun','rpentomino','acorn','diehard'],
     info:'<h4>图灵完备性</h4><p>Conway生命游戏已被证明是<b>图灵完备</b>的——理论上可以模拟任何计算。</p><p><code>Gosper滑翔机枪</code>周期性产生滑翔机，提供无限信号流。这是构建逻辑门的基础——滑翔机流代表"1"，无滑翔机代表"0"。</p><p><b>R-五联骨牌</b>仅5个细胞却能存活1103代，展示了涌现复杂性。</p>' },
-  { id:3, name:'3. 逻辑门', patterns:['signalPath','notGateGol','andGateGol','nandGateGol','gliderCollision','eater','notGate','nandGate','andGate','orGate','xorGate'],
-    info:'<h4>逻辑门：从滑翔机碰撞到布尔逻辑</h4><p>在GoL中，<b>滑翔机流=信号</b>：有流=1，无流=0。两列滑翔机相撞会<b>湮灭</b>——这是信号交互的基础。</p><p><b>前5个图案</b>是真正的GoL实现——按▶播放观察滑翔机枪产生信号流、流交叉碰撞、吞噬者消纳。</p><p><b>NOT门(GoL)</b>：标准枪(产生SE滑翔机)+旋转180°枪(产生NW滑翔机)，两流交叉碰撞→信号湮灭。</p><p><b>NAND门(GoL)</b>：两把旋转90°的枪+吞噬者，展示多流交互。</p><p><b>后5个</b>是交互式电路图——点击输入圆圈切换0/1。</p><p>2006年Brice Due用这些原理实现了<b>OTCA metapixel</b>！</p>' },
+  { id:3, name:'3. 逻辑门', patterns:['signalPath','eater','reflector','gunP60','reflectorDemo','gliderCollision','notGateGol','andGateGol','orGateGol','xorGateGol','notGate','nandGate','andGate','orGate','xorGate'],
+    info:'<h4>逻辑门：从滑翔机碰撞到布尔逻辑</h4><p>在GoL中，<b>滑翔机流=信号</b>：有流=1，无流=0。两列滑翔机相撞会<b>湮灭</b>——这是信号交互的基础。</p><p><b>基础元件：</b>吞噬者(消纳信号)、反射器(偏转90°)、P60枪(稀疏流控制时序)。</p><p><b>GoL逻辑门实现</b>——基于bespoyasov的P60枪碰撞方案：</p><p><b>NOT</b>=2枪+反射器 | <b>AND</b>=3枪+吞噬者 | <b>OR</b>=4枪+2吞噬者 | <b>XOR</b>=4枪+反射器</p><p>按▶播放观察真实碰撞。后5个是交互式电路图——点击输入切换0/1。</p>' },
   { id:4, name:'4. 加法器+寄存器', patterns:['halfAdder','fullAdder','fourBitAdder','srLatch','dFlipFlop','register4'],
     info:'<h4>加法器与寄存器</h4><p><b>半加器</b>：XOR计算和位，AND计算进位。<br><b>全加器</b>：两个半加器 + OR门，处理低位进位。<br><b>4位加法器</b>：4个全加器级联，实现4位二进制加法。</p><p><b>SR锁存器</b>：两个NAND门交叉连接，能存储1位信息——这是<b>内存</b>的基础！<br><b>D触发器</b>：时钟控制的锁存器，构成<b>寄存器</b>。</p>' },
   { id:5, name:'5. 扩展CPU', patterns:[],

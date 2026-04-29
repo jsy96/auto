@@ -6,7 +6,20 @@
       "Bash(git commit -m ' *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(powershell -NoProfile -Command \"Start-Process 'storage/tools/cellular_automaton.html'\")",
+      "Bash(powershell -NoProfile -Command \"Start-Process 'd:/cc01/cc03/aa/storage/tools/cellular_automaton.html'\")",
+      "mcp__zai-mcp-server__analyze_data_visualization",
+      "Read(//tmp/**)",
+      "Read(//tmp/binary-full-adder-in-the-game-of-life/gates/**)",
+      "Read(//d/tmp/binary-full-adder-in-the-game-of-life/gates/**)",
+      "Bash(cygpath -w /tmp/binary-full-adder-in-the-game-of-life/gates/and.js)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/gates/**)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/life/population/patterns/**)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/composition/**)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/circuit/**)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/life/**)",
+      "Read(//c/Users/jsy96/AppData/Local/Temp/binary-full-adder-in-the-game-of-life/**)"
     ]
   }
 }
