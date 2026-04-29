@@ -1,0 +1,10 @@
+﻿{
+    "tools":  [
+                  {
+                      "description":  "生成并打开元胞自动机交互式网页，支持生命游戏(2D)和初等元胞自动机(1D)，包含多种预设图案和颜色主题",
+                      "name":  "cellular_automaton",
+                      "file":  "cellular_automaton",
+                      "category":  "ai-discovered"
+                  }
+              ]
+}
