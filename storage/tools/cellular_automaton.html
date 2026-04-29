@@ -176,8 +176,31 @@ class GameOfLife {
 }
 
 // ============================================================================
+// Pattern rotation utility
+// ============================================================================
+function rotateCells(cells, times) {
+  let r = cells.map(([x,y])=>[x,y]);
+  for (let t = 0; t < times; t++) {
+    let my = 0; for (const [,y] of r) if (y > my) my = y;
+    r = r.map(([x,y])=>[my-y, x]);
+  }
+  let mx = Infinity, my2 = Infinity;
+  for (const [x,y] of r) { if(x<mx)mx=x; if(y<my2)my2=y; }
+  return r.map(([x,y])=>[x-mx,y-my2]);
+}
+
+// ============================================================================
 // Pattern Definitions
 // ============================================================================
+const _gunCells = [[24,0],[22,1],[24,1],[12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
+  [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],[0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
+  [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],[10,6],[16,6],[24,6],
+  [11,7],[15,7],[12,8],[13,8]];
+const _gun90 = rotateCells(_gunCells, 1);  // 90° CW
+const _gun180 = rotateCells(_gunCells, 2); // 180°
+const _gun270 = rotateCells(_gunCells, 3); // 270° CW
+const _eaterCells = [[1,0],[2,0],[0,1],[3,1],[1,2],[2,2],[2,3]];
+
 const P = {
   // Level 1: Gliders
   glider: { name: '滑翔机 (Glider)', desc: '最小的移动图案，沿对角线移动',
@@ -191,10 +214,7 @@ const P = {
 
   // Level 2: Turing Complete
   gliderGun: { name: 'Gosper滑翔机枪', desc: '周期30产生滑翔机，证明无限增长',
-    cells: [[24,0],[22,1],[24,1],[12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
-      [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],[0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
-      [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],[10,6],[16,6],[24,6],
-      [11,7],[15,7],[12,8],[13,8]] },
+    cells: _gunCells },
   rpentomino: { name: 'R-五联骨牌', desc: '5个细胞，稳定前存活1103代',
     cells: [[1,0],[2,0],[0,1],[1,1],[1,2]] },
   acorn: { name: '橡子 (Acorn)', desc: '7个细胞，稳定前存活5206代',
@@ -219,14 +239,41 @@ const P = {
 
   // Level 3: GoL building blocks
   eater: { name: '吞噬者 (Eater)', desc: '静物，可吞噬滑翔机，信号消纳元件',
-    cells: [[1,0],[2,0],[0,1],[3,1],[1,2],[2,2],[2,3]] },
+    cells: _eaterCells },
+  notGateGol: { name: 'NOT门 (GoL双枪交叉)', desc: '标准枪(SE) + 旋转枪(NW) 的滑翔机流交叉碰撞',
+    cells: (function(){
+      const g1 = _gunCells;
+      const g2 = _gun180.map(([x,y])=>[x+60,y+50]);
+      return [...g1,...g2];
+    })() },
+  andGateGol: { name: 'AND门 (GoL三枪)', desc: '三把枪的流交叉实现与门',
+    cells: (function(){
+      const g1 = _gunCells;
+      const g2 = _gun90.map(([x,y])=>[x+100,y+10]);
+      const g3 = _gun270.map(([x,y])=>[x+10,y+100]);
+      return [...g1,...g2,...g3];
+    })() },
+  nandGateGol: { name: 'NAND门 (GoL双枪+反射)', desc: '两把枪流交叉 + 吞噬者消纳 = 与非门',
+    cells: (function(){
+      const g1 = _gunCells;
+      const g2 = _gun90.map(([x,y])=>[x+80,y+20]);
+      const eaters = _eaterCells.map(([x,y])=>[x+120,y+60]);
+      return [...g1,...g2,...eaters];
+    })() },
+  signalPath: { name: '信号通道 (枪→吞噬者)', desc: '滑翔机枪产生信号流→吞噬者消纳，展示信号传播',
+    cells: (function(){
+      const gun = _gunCells;
+      const eater = _eaterCells.map(([x,y])=>[x+70,y+70]);
+      return [...gun,...eater];
+    })() },
   gliderCollision: { name: '滑翔机碰撞', desc: '两列滑翔机对撞湮灭——信号交互的基础',
     cells: (function(){
       const se = [[1,0],[2,1],[0,2],[1,2],[2,2]];
-      const nw = [[0,0],[1,0],[2,0],[1,1],[2,2]];
       const c = [];
-      se.forEach(([x,y])=>c.push([x+20,y+10]));
-      nw.forEach(([x,y])=>c.push([x+22,y+18]));
+      // 3 SE-moving gliders in a stream
+      for(let i=0;i<3;i++) se.forEach(([x,y])=>c.push([x+8*i+10,y+8*i+10]));
+      // 3 more SE gliders on a converging path
+      for(let i=0;i<3;i++) se.forEach(([x,y])=>c.push([x-8*i+30,y+8*i+5]));
       return c;
     })() },
   // Level 3+: Logic gates (shown in animated circuit view)
@@ -248,8 +295,8 @@ const LEVELS = [
     info:'<h4>滑翔机与飞船</h4><p>滑翔机(Glider)是Conway生命游戏中最小的移动图案，仅由5个细胞组成，每4代沿对角线移动1格。</p><p>飞船(Spaceship)沿正交方向移动。LWSS是最小的正交飞船。</p><p><b>操作：</b>点击放置图案，拖拽平移，滚轮缩放。▶播放观察运动。</p>' },
   { id:2, name:'2. 图灵完备', patterns:['gliderGun','rpentomino','acorn','diehard'],
     info:'<h4>图灵完备性</h4><p>Conway生命游戏已被证明是<b>图灵完备</b>的——理论上可以模拟任何计算。</p><p><code>Gosper滑翔机枪</code>周期性产生滑翔机，提供无限信号流。这是构建逻辑门的基础——滑翔机流代表"1"，无滑翔机代表"0"。</p><p><b>R-五联骨牌</b>仅5个细胞却能存活1103代，展示了涌现复杂性。</p>' },
-  { id:3, name:'3. 逻辑门', patterns:['gliderGun','eater','gliderCollision','notGate','nandGate','andGate','orGate','xorGate'],
-    info:'<h4>逻辑门：从滑翔机碰撞到布尔逻辑</h4><p>在GoL中，<b>滑翔机流=信号</b>：有流=1，无流=0。两列滑翔机相撞会<b>湮灭</b>——这是信号交互的基础。</p><p><b>NOT门</b>：滑翔机枪持续输出信号。当输入流与枪流交叉碰撞时，信号被阻断→输出取反。</p><p><code>NAND门</code>是<b>万能门</b>：仅用NAND就能构建AND、OR、NOT、XOR，进而构建加法器和CPU。</p><p>2006年Brice Due用这些原理实现了<b>OTCA metapixel</b>——在生命游戏里运行生命游戏！</p><p><b>操作：</b>前3个图案在GoL画布中模拟；后5个点击输入圆圈切换0/1。</p>' },
+  { id:3, name:'3. 逻辑门', patterns:['signalPath','notGateGol','andGateGol','nandGateGol','gliderCollision','eater','notGate','nandGate','andGate','orGate','xorGate'],
+    info:'<h4>逻辑门：从滑翔机碰撞到布尔逻辑</h4><p>在GoL中，<b>滑翔机流=信号</b>：有流=1，无流=0。两列滑翔机相撞会<b>湮灭</b>——这是信号交互的基础。</p><p><b>前5个图案</b>是真正的GoL实现——按▶播放观察滑翔机枪产生信号流、流交叉碰撞、吞噬者消纳。</p><p><b>NOT门(GoL)</b>：标准枪(产生SE滑翔机)+旋转180°枪(产生NW滑翔机)，两流交叉碰撞→信号湮灭。</p><p><b>NAND门(GoL)</b>：两把旋转90°的枪+吞噬者，展示多流交互。</p><p><b>后5个</b>是交互式电路图——点击输入圆圈切换0/1。</p><p>2006年Brice Due用这些原理实现了<b>OTCA metapixel</b>！</p>' },
   { id:4, name:'4. 加法器+寄存器', patterns:['halfAdder','fullAdder','fourBitAdder','srLatch','dFlipFlop','register4'],
     info:'<h4>加法器与寄存器</h4><p><b>半加器</b>：XOR计算和位，AND计算进位。<br><b>全加器</b>：两个半加器 + OR门，处理低位进位。<br><b>4位加法器</b>：4个全加器级联，实现4位二进制加法。</p><p><b>SR锁存器</b>：两个NAND门交叉连接，能存储1位信息——这是<b>内存</b>的基础！<br><b>D触发器</b>：时钟控制的锁存器，构成<b>寄存器</b>。</p>' },
   { id:5, name:'5. 扩展CPU', patterns:[],
@@ -731,7 +778,7 @@ class CPUSimulator {
 // ============================================================================
 // Main Application
 // ============================================================================
-const gol = new GameOfLife(300, 300);
+const gol = new GameOfLife(400, 400);
 const canvas = document.getElementById('golCanvas');
 const renderer = new GoLRenderer(canvas, gol);
 const circuitCanvas = document.getElementById('circuitCanvas');
