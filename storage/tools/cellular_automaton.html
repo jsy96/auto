@@ -217,7 +217,19 @@ const P = {
       return [...new Set(c.map(p=>p.join(',')))].map(s=>s.split(',').map(Number));
     })() },
 
-  // Level 3+: Conceptual patterns (shown in circuit view)
+  // Level 3: GoL building blocks
+  eater: { name: '吞噬者 (Eater)', desc: '静物，可吞噬滑翔机，信号消纳元件',
+    cells: [[1,0],[2,0],[0,1],[3,1],[1,2],[2,2],[2,3]] },
+  gliderCollision: { name: '滑翔机碰撞', desc: '两列滑翔机对撞湮灭——信号交互的基础',
+    cells: (function(){
+      const se = [[1,0],[2,1],[0,2],[1,2],[2,2]];
+      const nw = [[0,0],[1,0],[2,0],[1,1],[2,2]];
+      const c = [];
+      se.forEach(([x,y])=>c.push([x+20,y+10]));
+      nw.forEach(([x,y])=>c.push([x+22,y+18]));
+      return c;
+    })() },
+  // Level 3+: Logic gates (shown in animated circuit view)
   notGate: { name: 'NOT门 (非门)', desc: '输入取反', type:'circuit', gate:'NOT' },
   andGate: { name: 'AND门 (与门)', desc: '全1则1', type:'circuit', gate:'AND' },
   orGate: { name: 'OR门 (或门)', desc: '有1则1', type:'circuit', gate:'OR' },
@@ -236,8 +248,8 @@ const LEVELS = [
     info:'<h4>滑翔机与飞船</h4><p>滑翔机(Glider)是Conway生命游戏中最小的移动图案，仅由5个细胞组成，每4代沿对角线移动1格。</p><p>飞船(Spaceship)沿正交方向移动。LWSS是最小的正交飞船。</p><p><b>操作：</b>点击放置图案，拖拽平移，滚轮缩放。▶播放观察运动。</p>' },
   { id:2, name:'2. 图灵完备', patterns:['gliderGun','rpentomino','acorn','diehard'],
     info:'<h4>图灵完备性</h4><p>Conway生命游戏已被证明是<b>图灵完备</b>的——理论上可以模拟任何计算。</p><p><code>Gosper滑翔机枪</code>周期性产生滑翔机，提供无限信号流。这是构建逻辑门的基础——滑翔机流代表"1"，无滑翔机代表"0"。</p><p><b>R-五联骨牌</b>仅5个细胞却能存活1103代，展示了涌现复杂性。</p>' },
-  { id:3, name:'3. 逻辑门', patterns:['notGate','andGate','orGate','nandGate','xorGate'],
-    info:'<h4>逻辑门</h4><p>在GoL中，滑翔机流代表信号。两个滑翔机流相遇时发生碰撞——通过精心设计碰撞几何，可以实现布尔逻辑。</p><p><code>NAND门</code>是<b>万能门</code>：仅用NAND门就能构建AND、OR、NOT、XOR等所有逻辑门，进而构建加法器和CPU。</p><p>下方的真值表展示每种门的逻辑行为。点击输入位切换0/1。</p>' },
+  { id:3, name:'3. 逻辑门', patterns:['gliderGun','eater','gliderCollision','notGate','nandGate','andGate','orGate','xorGate'],
+    info:'<h4>逻辑门：从滑翔机碰撞到布尔逻辑</h4><p>在GoL中，<b>滑翔机流=信号</b>：有流=1，无流=0。两列滑翔机相撞会<b>湮灭</b>——这是信号交互的基础。</p><p><b>NOT门</b>：滑翔机枪持续输出信号。当输入流与枪流交叉碰撞时，信号被阻断→输出取反。</p><p><code>NAND门</code>是<b>万能门</b>：仅用NAND就能构建AND、OR、NOT、XOR，进而构建加法器和CPU。</p><p>2006年Brice Due用这些原理实现了<b>OTCA metapixel</b>——在生命游戏里运行生命游戏！</p><p><b>操作：</b>前3个图案在GoL画布中模拟；后5个点击输入圆圈切换0/1。</p>' },
   { id:4, name:'4. 加法器+寄存器', patterns:['halfAdder','fullAdder','fourBitAdder','srLatch','dFlipFlop','register4'],
     info:'<h4>加法器与寄存器</h4><p><b>半加器</b>：XOR计算和位，AND计算进位。<br><b>全加器</b>：两个半加器 + OR门，处理低位进位。<br><b>4位加法器</b>：4个全加器级联，实现4位二进制加法。</p><p><b>SR锁存器</b>：两个NAND门交叉连接，能存储1位信息——这是<b>内存</b>的基础！<br><b>D触发器</b>：时钟控制的锁存器，构成<b>寄存器</b>。</p>' },
   { id:5, name:'5. 扩展CPU', patterns:[],
@@ -351,279 +363,296 @@ class GoLRenderer {
 }
 
 // ============================================================================
-// Circuit Renderer (Levels 3-4)
+// GoL Gate Renderer (Levels 3-4) — Animated glider stream logic gates
 // ============================================================================
-class CircuitRenderer {
+class GoLGateRenderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.currentGate = null;
-    this.inputs = { A: 0, B: 0 };
+    this.gate = null;
+    this.inp = { A: 0, B: 0 };
+    this._srQ = 0; this._srQn = 1; this._dffQ = 0; this._reg4val = 0;
+    this.t = 0;
+    this.aid = null;
     this.resize();
-    window.addEventListener('resize', () => this.resize());
   }
   resize() {
     const r = this.canvas.parentElement.getBoundingClientRect();
     this.canvas.width = r.width;
     this.canvas.height = r.height;
-    this.draw();
   }
-  setGate(gate) {
-    this.currentGate = gate;
-    this.draw();
+  setGate(g) {
+    this.gate = g;
+    this.inp = { A: 0, B: 0 };
+    this._srQ = 0; this._srQn = 1; this._dffQ = 0; this._reg4val = 0;
+    if (!this.aid) this._loop();
   }
-  draw() {
-    const {ctx, canvas} = this;
-    ctx.fillStyle = '#0d1117';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (!this.currentGate) {
-      ctx.fillStyle = '#6b7a94';
-      ctx.font = '16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('选择一个图案查看电路图', canvas.width/2, canvas.height/2);
-      return;
+  stop() { if (this.aid) { cancelAnimationFrame(this.aid); this.aid = null; } }
+  _loop() { this.t++; this.draw(); this.aid = requestAnimationFrame(() => this._loop()); }
+
+  // — Animated glider stream drawing —
+  _stream(x1,y1,x2,y2,active,color) {
+    const ctx = this.ctx;
+    ctx.strokeStyle = active ? color : '#1a2235';
+    ctx.lineWidth = 2;
+    ctx.setLineDash(active ? [] : [4,4]);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.setLineDash([]);
+    if (active) {
+      const dx = x2-x1, dy = y2-y1, len = Math.hypot(dx,dy);
+      const ang = Math.atan2(dy,dx);
+      for (let d = (this.t*2.5)%32; d < len; d += 32) {
+        const px = x1+dx*d/len, py = y1+dy*d/len;
+        ctx.save(); ctx.translate(px,py); ctx.rotate(ang);
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(-3,-3); ctx.lineTo(-3,3); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
     }
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    this._drawGate(this.currentGate, cx, cy);
   }
-  _drawGate(type, cx, cy) {
-    const g = this;
-    const ctx = g.ctx;
-    const {A, B} = g.inputs;
+  _io(x,y,label,val,on) {
+    const ctx = this.ctx;
+    ctx.beginPath(); ctx.arc(x,y,16,0,Math.PI*2);
+    ctx.fillStyle = on ? 'rgba(0,255,136,0.2)' : 'rgba(255,255,255,0.04)';
+    ctx.fill();
+    ctx.strokeStyle = on ? '#00ff88' : '#2a3a52'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = on ? '#00ff88' : '#6b7a94';
+    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(val !== undefined ? val : label, x, y);
+    ctx.fillStyle = '#6b7a94'; ctx.font = '11px sans-serif';
+    ctx.fillText(label, x, y + 26);
+  }
+  _box(x,y,w,h,label) {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(0,170,255,0.06)';
+    ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x-w/2,y-h/2,w,h,6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#00aaff'; ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label,x,y);
+  }
+  _gun(x,y) {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#00aaff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('🔫 滑翔机枪', x, y - 12);
+    ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 1;
+    ctx.strokeRect(x-12, y, 24, 12);
+    ctx.fillStyle = '#00aaff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('GUN', x, y+8);
+  }
+
+  draw() {
+    const {ctx,canvas,gate,inp,t} = this;
+    ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (!gate) {
+      ctx.fillStyle = '#6b7a94'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('选择一个图案查看', canvas.width/2, canvas.height/2); return;
+    }
+    // Grid dots
+    ctx.fillStyle = '#151c28';
+    for (let x = 0; x < canvas.width; x += 20)
+      for (let y = 0; y < canvas.height; y += 20)
+        ctx.fillRect(x, y, 1, 1);
+
+    const cx = canvas.width/2, cy = canvas.height/2;
+    const animated = ['NOT','AND','OR','NAND','XOR'];
+    if (animated.includes(gate)) this._drawAnimated(gate, cx, cy);
+    else this._drawStatic(gate, cx, cy);
+    this._truth(gate, canvas.width, canvas.height);
+  }
+
+  _drawAnimated(type, cx, cy) {
+    const {ctx,inp,t} = this;
+    const A = inp.A, B = inp.B;
     let out;
-
-    const drawWire = (x1,y1,x2,y2,on) => {
-      ctx.strokeStyle = on ? '#00ff88' : '#2a3a52';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    };
-    const drawIO = (x,y,label,val,on) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 14, 0, Math.PI*2);
-      ctx.fillStyle = on ? 'rgba(0,255,136,0.2)' : 'rgba(255,255,255,0.04)';
-      ctx.fill();
-      ctx.strokeStyle = on ? '#00ff88' : '#2a3a52';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = on ? '#00ff88' : '#6b7a94';
-      ctx.font = 'bold 14px monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(val !== undefined ? val : label, x, y);
-    };
-    const gateBody = (x,y,w,h,label) => {
-      ctx.fillStyle = 'rgba(0,170,255,0.06)';
-      ctx.strokeStyle = '#00aaff';
-      ctx.lineWidth = 2;
-      const r = 6;
-      ctx.beginPath();
-      ctx.roundRect(x-w/2, y-h/2, w, h, r);
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#00aaff';
-      ctx.font = 'bold 13px monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(label, x, y);
-    };
-
-    const sx = cx - 200, ex = cx + 200;
+    const inX = cx - 260, outX = cx + 260;
 
     if (type === 'NOT') {
       out = A ? 0 : 1;
-      drawIO(sx, cy, 'A', A, A);
-      drawWire(sx+14, cy, cx-30, cy, A);
-      gateBody(cx, cy, 80, 40, 'NOT');
-      drawWire(cx+40, cy, ex-14, cy, out);
-      drawIO(ex, cy, 'Q', out, out);
-    } else if (type === 'AND') {
-      out = (A & B) ? 1 : 0;
-      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
-      drawWire(sx+14, cy-40, cx-30, cy-15, A);
-      drawWire(sx+14, cy+40, cx-30, cy+15, B);
-      gateBody(cx, cy, 80, 50, 'AND');
-      drawWire(cx+40, cy, ex-14, cy, out);
-      drawIO(ex, cy, 'Q', out, out);
-    } else if (type === 'OR') {
-      out = (A | B) ? 1 : 0;
-      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
-      drawWire(sx+14, cy-40, cx-30, cy-15, A);
-      drawWire(sx+14, cy+40, cx-30, cy+15, B);
-      gateBody(cx, cy, 80, 50, 'OR');
-      drawWire(cx+40, cy, ex-14, cy, out);
-      drawIO(ex, cy, 'Q', out, out);
+      const gunX = cx - 100, gunY = cy - 60;
+      const colX = cx + 20;
+      // Gun emitter
+      this._gun(gunX, gunY - 20);
+      // Gun stream → collision point
+      this._stream(gunX, gunY, colX, gunY, true, '#00ff88');
+      // Input stream (vertical, from bottom to collision)
+      this._stream(colX, cy + 80, colX, gunY, A, '#ff4466');
+      // Output stream (after collision)
+      this._stream(colX, gunY, outX, gunY, out, '#00aaff');
+      // Collision zone
+      if (A) {
+        ctx.fillStyle = 'rgba(255,68,102,0.25)';
+        ctx.beginPath(); ctx.arc(colX, gunY, 18, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#ff4466'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(colX, gunY, 18+4*Math.sin(t*0.15), 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = '#ff4466'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('碰撞！信号湮灭', colX, gunY + 35);
+      } else {
+        ctx.fillStyle = '#6b7a94'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('信号通过', colX, gunY + 35);
+      }
+      // IO
+      this._io(inX, cy + 80, 'A', A, A);
+      this._io(outX, gunY, 'Q', out, out);
+      // Labels
+      ctx.fillStyle = '#00ff88'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('滑翔机流 (恒定输出)', gunX + 10, gunY - 30);
+      ctx.fillStyle = out ? '#00aaff' : '#ff4466';
+      ctx.fillText(out ? '→ Q = 1 (信号通过)' : '× Q = 0 (信号被阻断)', colX + 30, gunY - 8);
+      // Explanation
+      ctx.fillStyle = '#6b7a94'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('NOT门原理：滑翔机枪持续输出信号流，输入流与枪流交叉碰撞时信号湮灭', cx, cy + 120);
+      ctx.fillText('输入 A=0 → 枪流通过 → Q=1 | 输入 A=1 → 碰撞湮灭 → Q=0', cx, cy + 138);
+
     } else if (type === 'NAND') {
-      out = (A & B) ? 0 : 1;
-      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
-      drawWire(sx+14, cy-40, cx-30, cy-15, A);
-      drawWire(sx+14, cy+40, cx-30, cy+15, B);
-      gateBody(cx, cy, 80, 50, 'NAND');
-      // small circle for inversion
-      ctx.beginPath(); ctx.arc(cx+43, cy, 5, 0, Math.PI*2);
-      ctx.strokeStyle='#ff4466'; ctx.lineWidth=2; ctx.stroke();
-      drawWire(cx+50, cy, ex-14, cy, out);
-      drawIO(ex, cy, 'Q', out, out);
+      out = (A && B) ? 0 : 1;
+      // Gun stream at top
+      const gunX = cx - 100, gunY = cy - 90;
+      const colX = cx + 10;
+      this._gun(gunX, gunY - 20);
+      this._stream(gunX, gunY, colX, gunY, true, '#00ff88');
+      // Two input streams crossing the gun stream
+      this._stream(colX - 30, cy + 30, colX - 30, gunY, A, '#ff4466');
+      this._stream(colX + 30, cy + 30, colX + 30, gunY, B, '#ffaa00');
+      // Output after collision zone
+      // In NAND: output blocked only when BOTH inputs present
+      const bothInputs = A && B;
+      this._stream(colX, gunY, outX, gunY, out, '#00aaff');
+      // Collision effects
+      if (A) { ctx.fillStyle='rgba(255,68,102,0.2)'; ctx.beginPath(); ctx.arc(colX-30,gunY,12,0,Math.PI*2); ctx.fill(); }
+      if (B) { ctx.fillStyle='rgba(255,170,0,0.2)'; ctx.beginPath(); ctx.arc(colX+30,gunY,12,0,Math.PI*2); ctx.fill(); }
+      if (bothInputs) {
+        ctx.fillStyle='rgba(255,68,102,0.3)'; ctx.beginPath(); ctx.arc(colX,gunY,20,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#ff4466'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.arc(colX,gunY,20+4*Math.sin(t*0.15),0,Math.PI*2); ctx.stroke();
+      }
+      this._io(inX, cy + 30, 'A', A, A);
+      this._io(inX + 80, cy + 30, 'B', B, B);
+      this._io(outX, gunY, 'Q', out, out);
+      ctx.fillStyle='#6b7a94'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('NAND = 万能门！仅用NAND门就能构建所有逻辑门→加法器→CPU', cx, cy + 100);
+      ctx.fillText('A=0,B=0→Q=1 | A=0,B=1→Q=1 | A=1,B=0→Q=1 | A=1,B=1→Q=0', cx, cy + 118);
+      ctx.fillStyle='#00aaff'; ctx.font='11px sans-serif';
+      ctx.fillText('仅有两输入同时为1时，双重碰撞才能完全阻断枪流', cx, cy + 138);
+
+    } else if (type === 'AND') {
+      out = (A && B) ? 1 : 0;
+      // Two input streams → gate → output
+      this._stream(inX + 30, cy - 50, cx - 50, cy - 15, A, '#00ff88');
+      this._stream(inX + 30, cy + 50, cx - 50, cy + 15, B, '#00aaff');
+      this._box(cx, cy, 90, 50, 'AND');
+      this._stream(cx + 45, cy, outX, cy, out, '#ffaa00');
+      this._io(inX, cy - 50, 'A', A, A);
+      this._io(inX, cy + 50, 'B', B, B);
+      this._io(outX, cy, 'Q', out, out);
+      ctx.fillStyle='#6b7a94'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('AND门：仅当 A=1 且 B=1 时输出1。等价于 NAND + NOT', cx, cy + 100);
+
+    } else if (type === 'OR') {
+      out = (A || B) ? 1 : 0;
+      this._stream(inX + 30, cy - 50, cx - 50, cy - 15, A, '#00ff88');
+      this._stream(inX + 30, cy + 50, cx - 50, cy + 15, B, '#00aaff');
+      this._box(cx, cy, 90, 50, 'OR');
+      this._stream(cx + 45, cy, outX, cy, out, '#ffaa00');
+      this._io(inX, cy - 50, 'A', A, A);
+      this._io(inX, cy + 50, 'B', B, B);
+      this._io(outX, cy, 'Q', out, out);
+      ctx.fillStyle='#6b7a94'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('OR门：A或B任意为1时输出1。可由3个NAND门构建', cx, cy + 100);
+
     } else if (type === 'XOR') {
       out = (A ^ B) ? 1 : 0;
-      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
-      drawWire(sx+14, cy-40, cx-30, cy-15, A);
-      drawWire(sx+14, cy+40, cx-30, cy+15, B);
-      gateBody(cx, cy, 80, 50, 'XOR');
-      drawWire(cx+40, cy, ex-14, cy, out);
-      drawIO(ex, cy, 'Q', out, out);
-    } else if (type === 'HALF_ADDER') {
-      const sum = A ^ B, carry = A & B;
-      drawIO(sx, cy-40, 'A', A, A); drawIO(sx, cy+40, 'B', B, B);
-      drawWire(sx+14, cy-40, cx-40, cy-15, A);
-      drawWire(sx+14, cy+40, cx-40, cy+15, B);
-      gateBody(cx, cy, 100, 60, 'HALF ADDER');
-      drawWire(cx+50, cy-15, ex-14, cy-50, sum);
-      drawIO(ex, cy-50, 'S', sum, sum);
-      drawWire(cx+50, cy+15, ex-14, cy+50, carry);
-      drawIO(ex, cy+50, 'C', carry, carry);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif';
-      ctx.textAlign='left'; ctx.fillText('Sum = A⊕B', ex+25, cy-50);
-      ctx.fillText('Carry = A·B', ex+25, cy+50);
-    } else if (type === 'FULL_ADDER') {
-      const Cin = this.inputs.Cin || 0;
-      const s1 = A ^ B, c1 = A & B;
-      const sum = s1 ^ Cin, c2 = s1 & Cin;
-      const carry = c1 | c2;
-      drawIO(sx, cy-60, 'A', A, A);
-      drawIO(sx, cy, 'B', B, B);
-      drawIO(sx, cy+60, 'Cin', Cin, Cin);
-      drawWire(sx+14, cy-60, cx-50, cy-25, A);
-      drawWire(sx+14, cy, cx-50, cy, B);
-      drawWire(sx+14, cy+60, cx-50, cy+25, Cin);
-      gateBody(cx, cy, 120, 70, 'FULL ADDER');
-      drawWire(cx+60, cy-20, ex-14, cy-50, sum);
-      drawIO(ex, cy-50, 'S', sum, sum);
-      drawWire(cx+60, cy+20, ex-14, cy+50, carry);
-      drawIO(ex, cy+50, 'Cout', carry, carry);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif';
-      ctx.textAlign='left'; ctx.fillText('S = A⊕B⊕Cin', ex+35, cy-50);
-      ctx.fillText('Cout = (A·B)|(Cin·(A⊕B))', ex+35, cy+50);
-      // Cin toggle button area
-      ctx.fillStyle='#1e2a42'; ctx.fillRect(sx-20, cy+75, 50, 24);
-      ctx.fillStyle=Cin?'#00ff88':'#6b7a94'; ctx.font='12px monospace'; ctx.textAlign='center';
-      ctx.fillText('Cin='+Cin, sx+5, cy+90);
-    } else if (type === 'ADDER4') {
-      const A4 = A, B4 = B;
-      const bits_a = [(A4>>3)&1,(A4>>2)&1,(A4>>1)&1,A4&1];
-      const bits_b = [(B4>>3)&1,(B4>>2)&1,(B4>>1)&1,B4&1];
-      let cin = 0, result = 0;
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='center';
-      for (let i = 0; i < 4; i++) {
-        const bx = cx - 120 + i * 80;
-        const s = bits_a[3-i] ^ bits_b[3-i] ^ cin;
-        const c = (bits_a[3-i] & bits_b[3-i]) | (cin & (bits_a[3-i] ^ bits_b[3-i]));
-        result = (result << 1) | s;
-        gateBody(bx, cy, 60, 40, 'FA'+i);
-        ctx.fillStyle='#00aaff'; ctx.font='10px monospace';
-        ctx.fillText('a='+bits_a[3-i]+' b='+bits_b[3-i], bx, cy+30);
-        ctx.fillText('cin='+cin+' s='+s, bx, cy+42);
-        cin = c;
-      }
-      drawIO(cx-240, cy-40, 'A='+A4, A4, A4);
-      drawIO(cx-240, cy+40, 'B='+B4, B4, B4);
-      drawIO(cx+200, cy, 'R='+result, result, result);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText(A4+' + '+B4+' = '+result+' (溢出:'+(cin?1:0)+')', cx-240, cy+80);
-    } else if (type === 'SR_LATCH') {
-      const S = A, R = B;
-      let Q = this._srQ || 0, Qn = this._srQn || 1;
-      if (S && !R) { Q = 1; Qn = 0; }
-      else if (!S && R) { Q = 0; Qn = 1; }
-      else if (S && R) { Q = 1; Qn = 1; }
-      this._srQ = Q; this._srQn = Qn;
-      drawIO(sx, cy-40, 'S', S, S); drawIO(sx, cy+40, 'R', R, R);
-      // Two NAND gates
-      gateBody(cx-40, cy-30, 60, 36, 'NAND');
-      gateBody(cx-40, cy+30, 60, 36, 'NAND');
-      drawWire(sx+14, cy-40, cx-70, cy-30, S);
-      drawWire(sx+14, cy+40, cx-70, cy+30, R);
-      // Cross feedback
-      drawWire(cx-10, cy-30, cx+30, cy+18, Q);
-      drawWire(cx-10, cy+30, cx+30, cy-18, Qn);
-      gateBody(cx+80, cy, 60, 70, 'SR');
-      drawWire(cx+50, cy-15, cx+60, cy-15, Q);
-      drawWire(cx+50, cy+15, cx+60, cy+15, Qn);
-      drawIO(ex, cy-30, 'Q', Q, Q);
-      drawIO(ex, cy+30, "Q'", Qn, Qn);
-      drawWire(cx+110, cy-15, ex-14, cy-30, Q);
-      drawWire(cx+110, cy+15, ex-14, cy+30, Qn);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText('S=1,R=0 → 存1  S=0,R=1 → 存0  S=0,R=0 → 保持', sx-20, cy+100);
-      ctx.fillText('这就是1位内存！', sx-20, cy+116);
-    } else if (type === 'D_FF') {
-      const D = A, CLK = B;
-      let Q = this._dffQ || 0;
-      if (CLK) Q = D;
-      this._dffQ = Q;
-      drawIO(sx, cy-40, 'D', D, D); drawIO(sx, cy+40, 'CLK', CLK, CLK);
-      gateBody(cx, cy, 100, 60, 'D Flip-Flop');
-      drawWire(sx+14, cy-40, cx-50, cy-15, D);
-      drawWire(sx+14, cy+40, cx-50, cy+15, CLK);
-      drawWire(cx+50, cy, ex-14, cy, Q);
-      drawIO(ex, cy, 'Q', Q, Q);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText('CLK=1时 Q←D, CLK=0时 保持', sx-20, cy+80);
-    } else if (type === 'REG4') {
-      const val = A;
-      const WE = B;
-      let stored = this._reg4val !== undefined ? this._reg4val : 0;
-      if (WE) stored = val;
-      this._reg4val = stored;
-      const bits = [(stored>>3)&1,(stored>>2)&1,(stored>>1)&1,stored&1];
-      drawIO(sx, cy-40, 'D='+val, val, val);
-      drawIO(sx, cy+40, 'WE='+WE, WE, WE);
-      gateBody(cx, cy, 120, 60, '4-BIT REG');
-      // Show bits
-      for (let i = 0; i < 4; i++) {
-        const bx = cx + 70 + i * 36;
-        ctx.fillStyle = bits[i] ? 'rgba(0,255,136,0.2)' : 'rgba(255,255,255,0.04)';
-        ctx.fillRect(bx-14, cy-10, 28, 20);
-        ctx.strokeStyle = bits[i] ? '#00ff88' : '#2a3a52';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(bx-14, cy-10, 28, 20);
-        ctx.fillStyle = bits[i] ? '#00ff88' : '#6b7a94';
-        ctx.font = '12px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(bits[i], bx, cy);
-      }
-      drawWire(sx+14, cy-40, cx-60, cy-15, val);
-      drawWire(sx+14, cy+40, cx-60, cy+15, WE);
-      drawIO(ex, cy, 'Q='+stored, stored, stored);
-      ctx.fillStyle='#6b7a94'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText('WE=1时加载新值，WE=0时保持', sx-20, cy+80);
-      ctx.fillText('4个D触发器并联 = 4位寄存器', sx-20, cy+96);
+      this._stream(inX + 30, cy - 50, cx - 50, cy - 15, A, '#00ff88');
+      this._stream(inX + 30, cy + 50, cx - 50, cy + 15, B, '#00aaff');
+      this._box(cx, cy, 90, 50, 'XOR');
+      this._stream(cx + 45, cy, outX, cy, out, '#ffaa00');
+      this._io(inX, cy - 50, 'A', A, A);
+      this._io(inX, cy + 50, 'B', B, B);
+      this._io(outX, cy, 'Q', out, out);
+      ctx.fillStyle='#6b7a94'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('XOR门（异或）：A≠B时输出1。半加器的核心：Sum = A⊕B', cx, cy + 100);
     }
-    // Draw truth table
-    this._drawTruthTable(type, ctx, canvas.width, canvas.height);
   }
-  _drawTruthTable(type, ctx, cw, ch) {
-    const tables = {
-      AND:  [[0,0,0],[0,1,0],[1,0,0],[1,1,1]],
-      OR:   [[0,0,0],[0,1,1],[1,0,1],[1,1,1]],
-      NAND: [[0,0,1],[0,1,1],[1,0,1],[1,1,0]],
-      XOR:  [[0,0,0],[0,1,1],[1,0,1],[1,1,0]],
-      NOT:  [[0,1],[1,0]],
-    };
-    const t = tables[type];
-    if (!t) return;
+
+  _drawStatic(type, cx, cy) {
+    const {ctx,inp} = this;
+    const {A,B} = inp;
+    const sx = cx-200, ex = cx+200;
+    const drawWire = (x1,y1,x2,y2,on)=>{ctx.strokeStyle=on?'#00ff88':'#2a3a52';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();};
+    const drawIO = (x,y,label,val,on)=>{ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fillStyle=on?'rgba(0,255,136,0.2)':'rgba(255,255,255,0.04)';ctx.fill();ctx.strokeStyle=on?'#00ff88':'#2a3a52';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle=on?'#00ff88':'#6b7a94';ctx.font='bold 14px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(val!==undefined?val:label,x,y);};
+    const gateBody = (x,y,w,h,label)=>{ctx.fillStyle='rgba(0,170,255,0.06)';ctx.strokeStyle='#00aaff';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,6);ctx.fill();ctx.stroke();ctx.fillStyle='#00aaff';ctx.font='bold 13px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x,y);};
+
+    if (type==='HALF_ADDER') {
+      const sum=A^B,carry=A&B;
+      drawIO(sx,cy-40,'A',A,A);drawIO(sx,cy+40,'B',B,B);
+      drawWire(sx+14,cy-40,cx-40,cy-15,A);drawWire(sx+14,cy+40,cx-40,cy+15,B);
+      gateBody(cx,cy,100,60,'HALF ADDER');
+      drawWire(cx+50,cy-15,ex-14,cy-50,sum);drawIO(ex,cy-50,'S',sum,sum);
+      drawWire(cx+50,cy+15,ex-14,cy+50,carry);drawIO(ex,cy+50,'C',carry,carry);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('Sum = A⊕B',ex+25,cy-50);ctx.fillText('Carry = A·B',ex+25,cy+50);
+    } else if (type==='FULL_ADDER') {
+      const Cin=this.inp.Cin||0;const s1=A^B,c1=A&B;const sum=s1^Cin,c2=s1&Cin;const carry=c1|c2;
+      drawIO(sx,cy-60,'A',A,A);drawIO(sx,cy,'B',B,B);drawIO(sx,cy+60,'Cin',Cin,Cin);
+      drawWire(sx+14,cy-60,cx-50,cy-25,A);drawWire(sx+14,cy,cx-50,cy,B);drawWire(sx+14,cy+60,cx-50,cy+25,Cin);
+      gateBody(cx,cy,120,70,'FULL ADDER');
+      drawWire(cx+60,cy-20,ex-14,cy-50,sum);drawIO(ex,cy-50,'S',sum,sum);
+      drawWire(cx+60,cy+20,ex-14,cy+50,carry);drawIO(ex,cy+50,'Cout',carry,carry);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('S = A⊕B⊕Cin',ex+35,cy-50);ctx.fillText('Cout=(A·B)|(Cin·(A⊕B))',ex+35,cy+50);
+      ctx.fillStyle='#1e2a42';ctx.fillRect(sx-20,cy+75,50,24);
+      ctx.fillStyle=Cin?'#00ff88':'#6b7a94';ctx.font='12px monospace';ctx.textAlign='center';ctx.fillText('Cin='+Cin,sx+5,cy+90);
+    } else if (type==='ADDER4') {
+      const A4=A,B4=B;const bits_a=[(A4>>3)&1,(A4>>2)&1,(A4>>1)&1,A4&1];const bits_b=[(B4>>3)&1,(B4>>2)&1,(B4>>1)&1,B4&1];
+      let cin=0,result=0;ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='center';
+      for(let i=0;i<4;i++){const bx=cx-120+i*80;const s=bits_a[3-i]^bits_b[3-i]^cin;const c=(bits_a[3-i]&bits_b[3-i])|(cin&(bits_a[3-i]^bits_b[3-i]));result=(result<<1)|s;gateBody(bx,cy,60,40,'FA'+i);ctx.fillStyle='#00aaff';ctx.font='10px monospace';ctx.fillText('a='+bits_a[3-i]+' b='+bits_b[3-i],bx,cy+30);ctx.fillText('cin='+cin+' s='+s,bx,cy+42);cin=c;}
+      drawIO(cx-240,cy-40,'A='+A4,A4,A4);drawIO(cx-240,cy+40,'B='+B4,B4,B4);drawIO(cx+200,cy,'R='+result,result,result);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText(A4+' + '+B4+' = '+result+' (溢出:'+(cin?1:0)+')',cx-240,cy+80);
+    } else if (type==='SR_LATCH') {
+      const S=A,R=B;let Q=this._srQ||0,Qn=this._srQn||1;
+      if(S&&!R){Q=1;Qn=0;}else if(!S&&R){Q=0;Qn=1;}else if(S&&R){Q=1;Qn=1;}
+      this._srQ=Q;this._srQn=Qn;
+      drawIO(sx,cy-40,'S',S,S);drawIO(sx,cy+40,'R',R,R);
+      gateBody(cx-40,cy-30,60,36,'NAND');gateBody(cx-40,cy+30,60,36,'NAND');
+      drawWire(sx+14,cy-40,cx-70,cy-30,S);drawWire(sx+14,cy+40,cx-70,cy+30,R);
+      drawWire(cx-10,cy-30,cx+30,cy+18,Q);drawWire(cx-10,cy+30,cx+30,cy-18,Qn);
+      gateBody(cx+80,cy,60,70,'SR');
+      drawWire(cx+50,cy-15,cx+60,cy-15,Q);drawWire(cx+50,cy+15,cx+60,cy+15,Qn);
+      drawIO(ex,cy-30,'Q',Q,Q);drawIO(ex,cy+30,"Q'",Qn,Qn);
+      drawWire(cx+110,cy-15,ex-14,cy-30,Q);drawWire(cx+110,cy+15,ex-14,cy+30,Qn);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('S=1,R=0→存1  S=0,R=1→存0  S=0,R=0→保持',sx-20,cy+100);
+      ctx.fillText('这就是1位内存！',sx-20,cy+116);
+    } else if (type==='D_FF') {
+      const D=A,CLK=B;let Q=this._dffQ||0;if(CLK)Q=D;this._dffQ=Q;
+      drawIO(sx,cy-40,'D',D,D);drawIO(sx,cy+40,'CLK',CLK,CLK);
+      gateBody(cx,cy,100,60,'D Flip-Flop');
+      drawWire(sx+14,cy-40,cx-50,cy-15,D);drawWire(sx+14,cy+40,cx-50,cy+15,CLK);
+      drawWire(cx+50,cy,ex-14,cy,Q);drawIO(ex,cy,'Q',Q,Q);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('CLK=1时 Q←D, CLK=0时 保持',sx-20,cy+80);
+    } else if (type==='REG4') {
+      const val=A,WE=B;let stored=this._reg4val!==undefined?this._reg4val:0;if(WE)stored=val;this._reg4val=stored;
+      const bits=[(stored>>3)&1,(stored>>2)&1,(stored>>1)&1,stored&1];
+      drawIO(sx,cy-40,'D='+val,val,val);drawIO(sx,cy+40,'WE='+WE,WE,WE);
+      gateBody(cx,cy,120,60,'4-BIT REG');
+      for(let i=0;i<4;i++){const bx=cx+70+i*36;ctx.fillStyle=bits[i]?'rgba(0,255,136,0.2)':'rgba(255,255,255,0.04)';ctx.fillRect(bx-14,cy-10,28,20);ctx.strokeStyle=bits[i]?'#00ff88':'#2a3a52';ctx.lineWidth=1;ctx.strokeRect(bx-14,cy-10,28,20);ctx.fillStyle=bits[i]?'#00ff88':'#6b7a94';ctx.font='12px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(bits[i],bx,cy);}
+      drawWire(sx+14,cy-40,cx-60,cy-15,val);drawWire(sx+14,cy+40,cx-60,cy+15,WE);
+      drawIO(ex,cy,'Q='+stored,stored,stored);
+      ctx.fillStyle='#6b7a94';ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('WE=1时加载新值，WE=0时保持',sx-20,cy+80);ctx.fillText('4个D触发器并联=4位寄存器',sx-20,cy+96);
+    }
+  }
+
+  _truth(type, cw, ch) {
+    const ctx = this.ctx;
+    const tables = {AND:[[0,0,0],[0,1,0],[1,0,0],[1,1,1]],OR:[[0,0,0],[0,1,1],[1,0,1],[1,1,1]],NAND:[[0,0,1],[0,1,1],[1,0,1],[1,1,0]],XOR:[[0,0,0],[0,1,1],[1,0,1],[1,1,0]],NOT:[[0,1],[1,0]]};
+    const t = tables[type]; if (!t) return;
     const tx = 40, ty = ch - 40 - t.length * 22;
-    ctx.fillStyle = 'rgba(0,170,255,0.06)';
-    ctx.fillRect(tx-8, ty-24, 160, 28 + t.length * 22);
-    ctx.fillStyle = '#00aaff'; ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'left'; ctx.fillText('真值表', tx, ty-8);
-    const cols = type === 'NOT' ? ['A','Q'] : ['A','B','Q'];
-    cols.forEach((c, i) => {
-      ctx.fillStyle = '#00aaff'; ctx.font = 'bold 11px monospace';
-      ctx.textAlign = 'center'; ctx.fillText(c, tx + 20 + i * 40, ty + 8);
-    });
-    t.forEach((row, ri) => {
-      row.forEach((v, ci) => {
-        ctx.fillStyle = v ? '#00ff88' : '#6b7a94';
-        ctx.font = '11px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(v, tx + 20 + ci * 40, ty + 28 + ri * 22);
-      });
-    });
+    ctx.fillStyle = 'rgba(0,170,255,0.06)'; ctx.fillRect(tx-8, ty-24, 160, 28+t.length*22);
+    ctx.fillStyle = '#00aaff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('真值表', tx, ty-8);
+    const cols = type==='NOT' ? ['A','Q'] : ['A','B','Q'];
+    cols.forEach((c,i)=>{ctx.fillStyle='#00aaff';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.fillText(c,tx+20+i*40,ty+8);});
+    t.forEach((row,ri)=>{row.forEach((v,ci)=>{ctx.fillStyle=v?'#00ff88':'#6b7a94';ctx.font='11px monospace';ctx.textAlign='center';ctx.fillText(v,tx+20+ci*40,ty+28+ri*22);});});
   }
 }
 
@@ -706,7 +735,7 @@ const gol = new GameOfLife(300, 300);
 const canvas = document.getElementById('golCanvas');
 const renderer = new GoLRenderer(canvas, gol);
 const circuitCanvas = document.getElementById('circuitCanvas');
-const circuit = new CircuitRenderer(circuitCanvas);
+const circuit = new GoLGateRenderer(circuitCanvas);
 const cpu = new CPUSimulator();
 
 let currentLevel = 1;
@@ -732,9 +761,13 @@ function switchLevel(id) {
   const lv = LEVELS.find(l => l.id === id);
 
   // Show/hide panels
-  document.getElementById('canvas-wrap').style.display = id <= 2 ? '' : 'none';
+  const hasGolPats = lv.patterns.some(pk => P[pk] && !P[pk].type);
+  const hasCircuitPats = lv.patterns.some(pk => P[pk] && P[pk].type === 'circuit');
+  document.getElementById('canvas-wrap').style.display = (id <= 2 || (id === 3 && hasGolPats)) ? '' : 'none';
   document.getElementById('circuit-panel').style.display = (id === 3 || id === 4) ? '' : 'none';
   document.getElementById('cpu-panel').style.display = id >= 5 ? '' : 'none';
+  if (id === 3 || id === 4) { circuit.resize(); circuit.setGate(null); circuit.stop(); }
+  if (id !== 3 && id !== 4) circuit.stop();
 
   // Build pattern list
   const pl = document.getElementById('patternList');
@@ -765,35 +798,40 @@ function selectPattern(key) {
   event.target.closest('.pat-btn').classList.add('active');
 
   if (pat.type === 'circuit') {
+    document.getElementById('canvas-wrap').style.display = 'none';
+    document.getElementById('circuit-panel').style.display = '';
     circuit.setGate(pat.gate);
-    circuit.inputs = { A: 0, B: 0 };
+    circuit.inp = { A: 0, B: 0 };
     circuit._srQ = 0; circuit._srQn = 1; circuit._dffQ = 0; circuit._reg4val = 0;
-    circuit.draw();
     // Add click handler for inputs
     circuitCanvas.onclick = e => {
-      const cx = circuitCanvas.width / 2;
-      const sx = cx - 200;
-      const cy = circuitCanvas.height / 2;
+      const ccx = circuitCanvas.width / 2, ccy = circuitCanvas.height / 2;
+      const inX = ccx - 260;
       const mx = e.offsetX, my = e.offsetY;
-      // Toggle A
-      if (Math.hypot(mx - sx, my - (cy - 40)) < 20) {
-        circuit.inputs.A ^= 1;
+      // Toggle A (position depends on gate type)
+      const isNot = pat.gate === 'NOT';
+      const aPos = isNot ? [inX, ccy + 80] : [inX, ccy - 50];
+      const bPos = isNot ? [inX + 80, ccy + 80] : [inX, ccy + 50];
+      // For NAND, B is at different position
+      const nandB = pat.gate === 'NAND' ? [inX + 80, ccy + 30] : bPos;
+      const actualB = pat.gate === 'NAND' ? nandB : bPos;
+      if (Math.hypot(mx - aPos[0], my - aPos[1]) < 22) circuit.inp.A ^= 1;
+      if (!isNot && Math.hypot(mx - actualB[0], my - actualB[1]) < 22) circuit.inp.B ^= 1;
+      // Cin toggle for full adder
+      if (pat.gate === 'FULL_ADDER') {
+        const sx = ccx - 200;
+        if (mx > sx - 25 && mx < sx + 30 && my > ccy + 70 && my < ccy + 100)
+          circuit.inp.Cin = (circuit.inp.Cin || 0) ^ 1;
       }
-      // Toggle B
-      if (Math.hypot(mx - sx, my - (cy + 40)) < 20) {
-        circuit.inputs.B ^= 1;
-      }
-      // Toggle Cin for full adder
-      if (pat.gate === 'FULL_ADDER' && mx > sx - 25 && mx < sx + 30 && my > cy + 70 && my < cy + 100) {
-        circuit.inputs.Cin = (circuit.inputs.Cin || 0) ^ 1;
-      }
-      circuit.draw();
     };
     return;
   }
 
-  // GoL pattern
-  if (currentLevel <= 2) {
+  // GoL pattern (Level 1-3)
+  if (currentLevel <= 3 && pat.cells) {
+    document.getElementById('canvas-wrap').style.display = '';
+    document.getElementById('circuit-panel').style.display = 'none';
+    circuit.stop();
     gol.clear();
     const ox = Math.floor(gol.w / 2 - 5);
     const oy = Math.floor(gol.h / 2 - 5);
